@@ -423,13 +423,26 @@ local function DamagePlayer(entity: any)
 	if Humanoid.Health <= 0 or IsPlayerProtected() then return end
     
     local config = entity.Config
-    local newHealth = math.clamp(Humanoid.Health - config.Damage.Amount, 0, Humanoid.MaxHealth)
+    local currentHealth = Humanoid.Health
+    local damageAmount = config.Damage.Amount
 
-    -- Update health
-    Humanoid.Health = newHealth
-    task.spawn(entity.RunCallback, entity, "OnDamagePlayer", newHealth)
+    -- Kiểm tra nếu máu hiện tại lớn hơn lượng sát thương thì mới trừ máu
+    if currentHealth > damageAmount then
+        Humanoid.Health = currentHealth - damageAmount
+    else
+        -- Nếu máu thấp hơn hoặc bằng lượng sát thương, ta set máu về 0 
+        -- (hoặc không làm gì nếu bạn muốn bảo toàn máu, nhưng thông thường entity trong DOORS sẽ kết liễu người chơi)
+        -- Dựa theo yêu cầu của bạn, nếu bạn muốn "không trừ máu" khi không đủ, hãy để như sau:
+        print("Máu người chơi thấp, không trừ máu.")
+    end
 
-    if newHealth == 0 then
+    -- Gọi Callback OnDamagePlayer bất kể có bị trừ máu hay không
+    -- Lưu ý: Chúng ta truyền giá trị máu hiện tại hoặc 0 tùy theo logic chết/sống của bạn
+    local healthToReport = (currentHealth > damageAmount) and (currentHealth - damageAmount) or 0
+    task.spawn(entity.RunCallback, entity, "OnDamagePlayer", healthToReport)
+
+    -- Logic xử lý cái chết nếu máu bị set về 0
+    if healthToReport == 0 then
         -- Death hints
         if #config.Death.Hints > 0 then
             PlayerGui.MainUI.Death:GetPropertyChangedSignal("Visible"):Wait()
