@@ -1,0 +1,530 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+loadstring(game:HttpGet(
+	"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Functions.lua"
+))()
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+local RESIST = false
+
+local REPENTANCE_URL =
+	"https://github.com/RegularVynixu/DOORS-Entity-Spawner/raw/6a9aa84681668d9bbd5c178557f48ad67aa42461/Assets/Repentance.rbxm?raw=true"
+
+local RepentanceAsset = LoadCustomInstance(REPENTANCE_URL)
+
+if not RepentanceAsset then
+	return
+end
+
+local Main_Game
+
+pcall(function()
+	Main_Game = require(
+		player.PlayerGui.MainUI.Initiator.Main_Game
+	)
+end)
+
+local function GetPivot(target)
+	if target:IsA("Model") then
+		return target:GetPivot()
+	elseif target:IsA("BasePart") then
+		return target.CFrame
+	end
+end
+
+local function SetPivot(target, cf)
+	if target:IsA("Model") then
+		target:PivotTo(cf)
+	elseif target:IsA("BasePart") then
+		target.CFrame = cf
+	end
+end
+
+local function IsAlive(target)
+	return target and target.Parent
+end
+
+local function CrucifixEntity(target, RESIST)
+	RESIST = RESIST == true
+	
+	if not IsAlive(target) then
+		return
+	end
+
+	local tool = character:FindFirstChildOfClass("Tool")
+
+	if not tool or tool.Name ~= "Crucifix" then
+		return
+	end
+
+	local targetPivot = GetPivot(target)
+
+	if not targetPivot then
+		return
+	end
+
+	local repentance = RepentanceAsset:Clone()
+
+	local crucifix = repentance:FindFirstChild("Crucifix")
+	local pentagram = repentance:FindFirstChild("Pentagram")
+	local entityPart = repentance:FindFirstChild("Entity")
+
+	if not crucifix or not pentagram or not entityPart then
+		repentance:Destroy()
+		return
+	end
+
+	local sound = RESIST
+		and crucifix:FindFirstChild("SoundFail")
+		or crucifix:FindFirstChild("Sound")
+
+	if not sound then
+		repentance:Destroy()
+		return
+	end
+
+	local circle = pentagram:FindFirstChild("Circle")
+	local base = pentagram:FindFirstChild("Base")
+	local lightAttach = base and base:FindFirstChild("LightAttach")
+	local lightBright = lightAttach and lightAttach:FindFirstChild("LightBright")
+
+	local bodyPosition = crucifix:FindFirstChild("BodyPosition")
+	local bodyAngularVelocity = crucifix:FindFirstChild("BodyAngularVelocity")
+	local crucifixLight = crucifix:FindFirstChild("Light")
+	local explodeParticle = crucifix:FindFirstChild("ExplodeParticle")
+
+	local toolPivot = tool:GetPivot()
+
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.FilterDescendantsInstances = {
+		character,
+		target,
+		repentance
+	}
+
+	local result = workspace:Raycast(
+		targetPivot.Position,
+		Vector3.new(0, -1000, 0),
+		params
+	)
+
+	if not result then
+		repentance:Destroy()
+		return
+	end
+
+	repentance:PivotTo(CFrame.new(result.Position))
+
+	crucifix.CFrame = toolPivot
+	entityPart.CFrame = targetPivot
+
+	if bodyPosition then
+		bodyPosition.Position = (
+			targetPivot * CFrame.new(0.5, 3, -6)
+		).Position
+	end
+
+	repentance.Parent = workspace
+
+	local shaker
+
+	pcall(function()
+		if Main_Game and Main_Game.camShaker then
+			shaker = Main_Game.camShaker:StartShake(
+				5,
+				20,
+				2,
+				Vector3.new()
+			)
+		end
+	end)
+
+	local function waitUntil(t)
+		repeat
+			RunService.RenderStepped:Wait()
+		until not sound.Parent or sound.TimePosition >= t
+	end
+
+	local function fadeOut()
+		for _, v in ipairs(pentagram:GetChildren()) do
+			if v.Name == "BeamFlat" then
+				task.delay(v:GetAttribute("Delay") or 0, function()
+					if not v.Parent then
+						return
+					end
+
+					TweenService:Create(
+						v,
+						TweenInfo.new(
+							1.5,
+							Enum.EasingStyle.Sine,
+							Enum.EasingDirection.In
+						),
+						{
+							Brightness = 0
+						}
+					):Play()
+				end)
+			end
+		end
+	end
+
+	sound:Play()
+
+	-- Giữ entity theo EntityPart giống spawner
+	local followConnection = RunService.RenderStepped:Connect(function()
+		if not repentance.Parent then
+			return
+		end
+
+		if not IsAlive(target) then
+			return
+		end
+
+		SetPivot(target, entityPart.CFrame)
+	end)
+
+	if circle then
+		TweenService:Create(
+			circle,
+			TweenInfo.new(
+				2,
+				Enum.EasingStyle.Exponential,
+				Enum.EasingDirection.Out
+			),
+			{
+				CFrame = circle.CFrame - Vector3.new(0, 25, 0)
+			}
+		):Play()
+
+		task.delay(2, function()
+			if circle.Parent then
+				circle:Destroy()
+			end
+		end)
+	end
+
+	if bodyAngularVelocity then
+		TweenService:Create(
+			bodyAngularVelocity,
+			TweenInfo.new(
+				4,
+				Enum.EasingStyle.Sine,
+				Enum.EasingDirection.In
+			),
+			{
+				AngularVelocity = Vector3.new(0, 40, 0)
+			}
+		):Play()
+	end
+
+	task.spawn(function()
+		waitUntil(2.625)
+
+		if lightBright then
+			TweenService:Create(
+				lightBright,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 5,
+					Range = 40
+				}
+			):Play()
+		end
+
+		if crucifixLight then
+			TweenService:Create(
+				crucifixLight,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 11.25,
+					Range = 30
+				}
+			):Play()
+		end
+
+		task.wait(1.5)
+
+		if lightBright then
+			TweenService:Create(
+				lightBright,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 0,
+					Range = 0
+				}
+			):Play()
+		end
+
+		if crucifixLight then
+			TweenService:Create(
+				crucifixLight,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 0,
+					Range = 0
+				}
+			):Play()
+		end
+
+		if not RESIST then
+			if crucifixLight then
+				TweenService:Create(
+					crucifixLight,
+					TweenInfo.new(
+						1,
+						Enum.EasingStyle.Circular,
+						Enum.EasingDirection.InOut
+					),
+					{
+						Brightness = 15,
+						Range = 40
+					}
+				):Play()
+			end
+
+			if shaker then
+				pcall(function()
+					shaker:StartFadeOut(3)
+				end)
+			end
+
+			fadeOut()
+
+			if bodyAngularVelocity then
+				TweenService:Create(
+					bodyAngularVelocity,
+					TweenInfo.new(
+						3,
+						Enum.EasingStyle.Sine,
+						Enum.EasingDirection.Out
+					),
+					{
+						AngularVelocity = Vector3.new()
+					}
+				):Play()
+			end
+		end
+	end)
+
+	if not RESIST then
+		waitUntil(2)
+
+		-- Entity bị kéo xuống 25 studs
+		TweenService:Create(
+			entityPart,
+			TweenInfo.new(
+				3,
+				Enum.EasingStyle.Back,
+				Enum.EasingDirection.In
+			),
+			{
+				CFrame = entityPart.CFrame - Vector3.new(0, 25, 0)
+			}
+		):Play()
+
+		-- Fade sound của entity
+		if target:IsA("Model") then
+			for _, v in ipairs(target:GetDescendants()) do
+				if v:IsA("Sound") and not v:GetAttribute("VolumeIgnore") then
+					TweenService:Create(
+						v,
+						TweenInfo.new(
+							3,
+							Enum.EasingStyle.Back,
+							Enum.EasingDirection.In
+						),
+						{
+							Volume = 0
+						}
+					):Play()
+				end
+			end
+		end
+
+		waitUntil(6.75)
+	else
+		waitUntil(4)
+
+		if bodyAngularVelocity then
+			TweenService:Create(
+				bodyAngularVelocity,
+				TweenInfo.new(
+					3,
+					Enum.EasingStyle.Sine,
+					Enum.EasingDirection.Out
+				),
+				{
+					AngularVelocity = Vector3.new()
+				}
+			):Play()
+		end
+
+		if lightBright then
+			TweenService:Create(
+				lightBright,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 0,
+					Range = 0,
+					Color = Color3.fromRGB(255, 116, 130)
+				}
+			):Play()
+		end
+
+		if crucifixLight then
+			TweenService:Create(
+				crucifixLight,
+				TweenInfo.new(
+					1.5,
+					Enum.EasingStyle.Circular,
+					Enum.EasingDirection.InOut
+				),
+				{
+					Brightness = 0,
+					Range = 0,
+					Color = Color3.fromRGB(255, 116, 130)
+				}
+			):Play()
+		end
+
+		if shaker then
+			pcall(function()
+				shaker:StartFadeOut(3)
+			end)
+		end
+
+		task.spawn(function()
+			local color = Instance.new("Color3Value")
+			color.Value = Color3.fromRGB(137, 207, 255)
+
+			local tween = TweenService:Create(
+				color,
+				TweenInfo.new(
+					0.5,
+					Enum.EasingStyle.Sine
+				),
+				{
+					Value = Color3.fromRGB(255, 116, 130)
+				}
+			)
+
+			tween:Play()
+
+			while tween.PlaybackState == Enum.PlaybackState.Playing do
+				for _, d in ipairs(repentance:GetDescendants()) do
+					if d:IsA("Beam") then
+						d.Color = ColorSequence.new({
+							ColorSequenceKeypoint.new(0, color.Value),
+							ColorSequenceKeypoint.new(1, color.Value)
+						})
+					elseif d.Name == "Crucifix"
+						and d:IsA("BasePart")
+					then
+						d.Color = color.Value
+					end
+				end
+
+				RunService.RenderStepped:Wait()
+			end
+
+			color:Destroy()
+		end)
+
+		waitUntil(9.625)
+	end
+
+	if followConnection then
+		followConnection:Disconnect()
+	end
+
+	local tween = TweenService:Create(
+	repentance.Crucifix,
+	TweenInfo.new(1),
+	{
+		Size = repentance.Crucifix.Size * 3,
+		Transparency = 1
+	}
+)
+
+task.spawn(function() 
+tween:Play()
+tween.Completed:Wait()
+
+if target and target.Parent then
+	target:Destroy()
+end
+end) 
+
+	if lightBright then
+		TweenService:Create(
+			lightBright,
+			TweenInfo.new(1),
+			{
+				Brightness = 0,
+				Range = 0
+			}
+		):Play()
+	end
+
+	if crucifixLight then
+		TweenService:Create(
+			crucifixLight,
+			TweenInfo.new(1),
+			{
+				Brightness = 0,
+				Range = 0
+			}
+		):Play()
+	end
+
+	if not RESIST then
+		if explodeParticle then
+			explodeParticle:Emit(math.random(20, 30))
+		end
+
+		pcall(function()
+			if Main_Game and Main_Game.camShaker then
+				Main_Game.camShaker:ShakeOnce(
+					7.5,
+					7.5,
+					0.25,
+					1.5
+				)
+			end
+		end)
+	end
+
+	task.delay(5, function()
+		if repentance.Parent then
+			repentance:Destroy()
+		end
+	end)
+end
+
+return CrucifixEntity
