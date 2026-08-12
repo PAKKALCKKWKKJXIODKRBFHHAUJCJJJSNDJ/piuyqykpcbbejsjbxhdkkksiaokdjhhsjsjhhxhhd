@@ -48,28 +48,58 @@ local function IsAlive(target)
 	return target and target.Parent
 end
 
-local function CrucifixEntity(target, RESIST)
+-- Thêm tham số maxDistance (khoảng cách tối đa để kích hoạt)
+local function CrucifixEntity(target, RESIST, maxDistance)
 	RESIST = RESIST == true
+	maxDistance = maxDistance or 30 -- Mặc định là 30 studs nếu không truyền vào
 	
 	if not IsAlive(target) then
 		return
 	end
 
-	local tool = character:FindFirstChildOfClass("Tool")
-
-	if not tool or tool.Name ~= "Crucifix" then
+	local hrp = character:FindFirstChild("HumanoidRootPart")
+	if not hrp then
 		return
 	end
+
+	-- Lấy BasePart đầu tiên của target để đo khoảng cách
+	local targetPart
+	if target:IsA("Model") then
+		targetPart = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
+	elseif target:IsA("BasePart") then
+		targetPart = target
+	end
+
+	if not targetPart then
+		return
+	end
+
+	-- Đợi cho đến khi cầm Crucifix VÀ khoảng cách nhỏ hơn hoặc bằng maxDistance
+	local tool
+	repeat
+		tool = character:FindFirstChildOfClass("Tool")
+		local hasCrucifix = tool and tool.Name == "Crucifix"
+		local inRange = false
+
+		if IsAlive(target) and hrp and targetPart then
+			local distance = (hrp.Position - targetPart.Position).Magnitude
+			inRange = distance <= maxDistance
+		end
+
+		if not hasCrucifix or not inRange then
+			task.wait(0.1)
+		end
+	until tool and tool.Name == "Crucifix" and IsAlive(target) and (hrp.Position - targetPart.Position).Magnitude <= maxDistance
 	
 	local selectedCrucifix = tool
 
-task.spawn(function()
-	task.wait(0.7)
+	task.spawn(function()
+		task.wait(0.2)
 
-	if selectedCrucifix and selectedCrucifix.Parent then
-		selectedCrucifix:Destroy()
-	end
-end)
+		if selectedCrucifix and selectedCrucifix.Parent then
+			selectedCrucifix:Destroy()
+		end
+	end)
 
 	local targetPivot = GetPivot(target)
 
@@ -474,22 +504,22 @@ end)
 	end
 
 	local tween = TweenService:Create(
-	repentance.Crucifix,
-	TweenInfo.new(1),
-	{
-		Size = repentance.Crucifix.Size * 3,
-		Transparency = 1
-	}
-)
+		repentance.Crucifix,
+		TweenInfo.new(1),
+		{
+			Size = repentance.Crucifix.Size * 3,
+			Transparency = 1
+		}
+	)
 
-task.spawn(function() 
-tween:Play()
-tween.Completed:Wait()
+	task.spawn(function() 
+		tween:Play()
+		tween.Completed:Wait()
 
-if target and target.Parent then
-	target:Destroy()
-end
-end) 
+		if target and target.Parent then
+			target:Destroy()
+		end
+	end) 
 
 	if lightBright then
 		TweenService:Create(
