@@ -9,8 +9,6 @@ loadstring(game:HttpGet(
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
-local RESIST = false
-
 local REPENTANCE_URL =
 	"https://github.com/RegularVynixu/DOORS-Entity-Spawner/raw/6a9aa84681668d9bbd5c178557f48ad67aa42461/Assets/Repentance.rbxm?raw=true"
 
@@ -48,13 +46,14 @@ local function IsAlive(target)
 	return target and target.Parent
 end
 
--- Thêm tham số maxDistance (khoảng cách tối đa để kích hoạt)
-local function CrucifixEntity(target, RESIST, maxDistance, effectColor)
-	RESIST = RESIST == true
-	maxDistance = maxDistance or 30
-	effectColor = effectColor or "Default"
+local function CrucifixEntity(config)
+	local Target = config.Target
+	local RESIST = config.Resist == true -- Đảo logic: để true thì bật resist
+	local maxDistance = config.RequiredDistance or 30
+	local effectColor = config.Color or "Default"
+	local assetId = config.Symbol or "Moon"
 	
-	if not IsAlive(target) then
+	if not IsAlive(Target) then
 		return
 	end
 
@@ -63,26 +62,24 @@ local function CrucifixEntity(target, RESIST, maxDistance, effectColor)
 		return
 	end
 
-	-- Lấy BasePart đầu tiên của target để đo khoảng cách
 	local targetPart
-	if target:IsA("Model") then
-		targetPart = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart")
-	elseif target:IsA("BasePart") then
-		targetPart = target
+	if Target:IsA("Model") then
+		targetPart = Target.PrimaryPart or Target:FindFirstChildWhichIsA("BasePart")
+	elseif Target:IsA("BasePart") then
+		targetPart = Target
 	end
 
 	if not targetPart then
 		return
 	end
 
-	-- Đợi cho đến khi cầm Crucifix VÀ khoảng cách nhỏ hơn hoặc bằng maxDistance
 	local tool
 	repeat
 		tool = character:FindFirstChildOfClass("Tool")
 		local hasCrucifix = tool and tool.Name == "Crucifix"
 		local inRange = false
 
-		if IsAlive(target) and hrp and targetPart then
+		if IsAlive(Target) and hrp and targetPart then
 			local distance = (hrp.Position - targetPart.Position).Magnitude
 			inRange = distance <= maxDistance
 		end
@@ -90,7 +87,7 @@ local function CrucifixEntity(target, RESIST, maxDistance, effectColor)
 		if not hasCrucifix or not inRange then
 			task.wait(0.1)
 		end
-	until tool and tool.Name == "Crucifix" and IsAlive(target) and (hrp.Position - targetPart.Position).Magnitude <= maxDistance
+	until tool and tool.Name == "Crucifix" and IsAlive(Target) and (hrp.Position - targetPart.Position).Magnitude <= maxDistance
 	
 	local selectedCrucifix = tool
 
@@ -102,55 +99,80 @@ local function CrucifixEntity(target, RESIST, maxDistance, effectColor)
 		end
 	end)
 
-	local targetPivot = GetPivot(target)
+	local targetPivot = GetPivot(Target)
 
 	if not targetPivot then
 		return
 	end
 
 	local repentance = RepentanceAsset:Clone()
-	
-	local function RecolorPreserveHSV(color, newColor)
-	local h = select(1, Color3.toHSV(newColor))
-	local _, s, v = Color3.toHSV(color)
 
-	return Color3.fromHSV(h, s, v)
-end
+	if assetId ~= "Moon" then
+		local pentagramForTexture = repentance:FindFirstChild("Pentagram")
 
-if not RESIST and effectColor ~= "Default" and typeof(effectColor) == "Color3" then
-	for _, d in ipairs(repentance:GetDescendants()) do
-		if d:IsA("Beam")
-			or d:IsA("ParticleEmitter")
-			or d:IsA("Trail")
-		then
-			local keypoints = {}
+		if pentagramForTexture then
+			local beamFlats = {}
 
-			for _, keypoint in ipairs(d.Color.Keypoints) do
-				table.insert(
-					keypoints,
-					ColorSequenceKeypoint.new(
-						keypoint.Time,
-						RecolorPreserveHSV(
-							keypoint.Value,
-							effectColor
-						)
-					)
-				)
+			for _, child in ipairs(pentagramForTexture:GetChildren()) do
+				if child.Name == "BeamFlat" and child:IsA("Beam") then
+					table.insert(beamFlats, child)
+				end
 			end
 
-			d.Color = ColorSequence.new(keypoints)
+			if #beamFlats >= 4 then
+				local lastBeamFlat = beamFlats[4]
+				local textureId = tostring(assetId)
 
-		elseif d:IsA("PointLight")
-			or d:IsA("SpotLight")
-			or d:IsA("SurfaceLight")
-		then
-			d.Color = RecolorPreserveHSV(
-				d.Color,
-				effectColor
-			)
+				if not textureId:match("^rbxassetid://") then
+					textureId = "rbxassetid://" .. textureId
+				end
+
+				lastBeamFlat.Texture = textureId
+			end
 		end
 	end
-end
+	
+	local function RecolorPreserveHSV(color, newColor)
+		local h = select(1, Color3.toHSV(newColor))
+		local _, s, v = Color3.toHSV(color)
+
+		return Color3.fromHSV(h, s, v)
+	end
+
+	if not RESIST and effectColor ~= "Default" and typeof(effectColor) == "Color3" then
+		for _, d in ipairs(repentance:GetDescendants()) do
+			if d:IsA("Beam")
+				or d:IsA("ParticleEmitter")
+				or d:IsA("Trail")
+			then
+				local keypoints = {}
+
+				for _, keypoint in ipairs(d.Color.Keypoints) do
+					table.insert(
+						keypoints,
+						ColorSequenceKeypoint.new(
+							keypoint.Time,
+							RecolorPreserveHSV(
+								keypoint.Value,
+								effectColor
+							)
+						)
+					)
+				end
+
+				d.Color = ColorSequence.new(keypoints)
+
+			elseif d:IsA("PointLight")
+				or d:IsA("SpotLight")
+				or d:IsA("SurfaceLight")
+			then
+				d.Color = RecolorPreserveHSV(
+					d.Color,
+					effectColor
+				)
+			end
+		end
+	end
 
 	local crucifix = repentance:FindFirstChild("Crucifix")
 	local pentagram = repentance:FindFirstChild("Pentagram")
@@ -186,7 +208,7 @@ end
 	params.FilterType = Enum.RaycastFilterType.Exclude
 	params.FilterDescendantsInstances = {
 		character,
-		target,
+		Target,
 		repentance
 	}
 
@@ -207,10 +229,10 @@ end
 	entityPart.CFrame = targetPivot
 
 	if bodyPosition then
-	bodyPosition.Position = (
-		hrp.CFrame * CFrame.new(0.5, 3, -6)
-	).Position
-end
+		bodyPosition.Position = (
+			hrp.CFrame * CFrame.new(0.5, 3, -6)
+		).Position
+	end
 
 	repentance.Parent = workspace
 
@@ -259,17 +281,16 @@ end
 
 	sound:Play()
 
-	-- Giữ entity theo EntityPart giống spawner
 	local followConnection = RunService.RenderStepped:Connect(function()
 		if not repentance.Parent then
 			return
 		end
 
-		if not IsAlive(target) then
+		if not IsAlive(Target) then
 			return
 		end
 
-		SetPivot(target, entityPart.CFrame)
+		SetPivot(Target, entityPart.CFrame)
 	end)
 
 	if circle then
@@ -414,7 +435,6 @@ end
 	if not RESIST then
 		waitUntil(2)
 
-		-- Entity bị kéo xuống 25 studs
 		TweenService:Create(
 			entityPart,
 			TweenInfo.new(
@@ -427,9 +447,8 @@ end
 			}
 		):Play()
 
-		-- Fade sound của entity
-		if target:IsA("Model") then
-			for _, v in ipairs(target:GetDescendants()) do
+		if Target:IsA("Model") then
+			for _, v in ipairs(Target:GetDescendants()) do
 				if v:IsA("Sound") and not v:GetAttribute("VolumeIgnore") then
 					TweenService:Create(
 						v,
@@ -547,24 +566,24 @@ end
 	end
 
 	local tween = TweenService:Create(
-	repentance.Crucifix,
-	TweenInfo.new(1),
-	{
-		Size = repentance.Crucifix.Size * 3,
-		Transparency = 1
-	}
-)
+		repentance.Crucifix,
+		TweenInfo.new(1),
+		{
+			Size = repentance.Crucifix.Size * 3,
+			Transparency = 1
+		}
+	)
 
-task.spawn(function()
-	tween:Play()
-	tween.Completed:Wait()
+	task.spawn(function()
+		tween:Play()
+		tween.Completed:Wait()
 
-	if not RESIST then
-		if target and target.Parent then
-			target:Destroy()
+		if not RESIST then
+			if Target and Target.Parent then
+				Target:Destroy()
+			end
 		end
-	end
-end)
+	end)
 
 	if lightBright then
 		TweenService:Create(
@@ -589,35 +608,34 @@ end)
 	end
 
 	if not RESIST then
-	if explodeParticle then
-		explodeParticle:Emit(math.random(20, 30))
+		if explodeParticle then
+			explodeParticle:Emit(math.random(20, 30))
+		end
+
+		pcall(function()
+			if Main_Game and Main_Game.camShaker then
+				Main_Game.camShaker:ShakeOnce(
+					7.5,
+					7.5,
+					0.25,
+					1.5
+				)
+			end
+		end)
+	else
+		if Target and Target.Parent then
+			Target:SetAttribute("BeingBanished", false)
+			Target:SetAttribute("Paused", false)
+		end
+
+		fadeOut()
 	end
 
-	pcall(function()
-		if Main_Game and Main_Game.camShaker then
-			Main_Game.camShaker:ShakeOnce(
-				7.5,
-				7.5,
-				0.25,
-				1.5
-			)
+	task.delay(5, function()
+		if repentance.Parent then
+			repentance:Destroy()
 		end
 	end)
-else
-	if target and target.Parent then
-		target:SetAttribute("BeingBanished", false)
-		target:SetAttribute("Paused", false)
-	end
-
-	fadeOut()
-end
-
-task.delay(5, function()
-	if repentance.Parent then
-		repentance:Destroy()
-	end
-end)
-
 end
 
 return CrucifixEntity
