@@ -49,9 +49,10 @@ local function IsAlive(target)
 end
 
 -- Thêm tham số maxDistance (khoảng cách tối đa để kích hoạt)
-local function CrucifixEntity(target, RESIST, maxDistance)
+local function CrucifixEntity(target, RESIST, maxDistance, effectColor)
 	RESIST = RESIST == true
-	maxDistance = maxDistance or 30 -- Mặc định là 30 studs nếu không truyền vào
+	maxDistance = maxDistance or 30
+	effectColor = effectColor or "Default"
 	
 	if not IsAlive(target) then
 		return
@@ -108,6 +109,48 @@ local function CrucifixEntity(target, RESIST, maxDistance)
 	end
 
 	local repentance = RepentanceAsset:Clone()
+	
+	local function RecolorPreserveHSV(color, newColor)
+	local h = select(1, Color3.toHSV(newColor))
+	local _, s, v = Color3.toHSV(color)
+
+	return Color3.fromHSV(h, s, v)
+end
+
+if not RESIST and effectColor ~= "Default" and typeof(effectColor) == "Color3" then
+	for _, d in ipairs(repentance:GetDescendants()) do
+		if d:IsA("Beam")
+			or d:IsA("ParticleEmitter")
+			or d:IsA("Trail")
+		then
+			local keypoints = {}
+
+			for _, keypoint in ipairs(d.Color.Keypoints) do
+				table.insert(
+					keypoints,
+					ColorSequenceKeypoint.new(
+						keypoint.Time,
+						RecolorPreserveHSV(
+							keypoint.Value,
+							effectColor
+						)
+					)
+				)
+			end
+
+			d.Color = ColorSequence.new(keypoints)
+
+		elseif d:IsA("PointLight")
+			or d:IsA("SpotLight")
+			or d:IsA("SurfaceLight")
+		then
+			d.Color = RecolorPreserveHSV(
+				d.Color,
+				effectColor
+			)
+		end
+	end
+end
 
 	local crucifix = repentance:FindFirstChild("Crucifix")
 	local pentagram = repentance:FindFirstChild("Pentagram")
