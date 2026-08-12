@@ -132,47 +132,95 @@ local function CrucifixEntity(config)
 		end
 	end
 	
-	local function RecolorPreserveHSV(color, newColor)
-		local h = select(1, Color3.toHSV(newColor))
-		local _, s, v = Color3.toHSV(color)
+	local function RecolorPreserveHSV(originalColor, requestedColor)
+	local _, originalS, originalV = Color3.toHSV(originalColor)
+	local requestedH = select(1, Color3.toHSV(requestedColor))
 
-		return Color3.fromHSV(h, s, v)
+	return Color3.fromHSV(
+		requestedH,
+		originalS,
+		originalV
+	)
+end
+
+local function RecolorSequence(sequence, requestedColor)
+	local keypoints = {}
+
+	for _, keypoint in ipairs(sequence.Keypoints) do
+		table.insert(
+			keypoints,
+			ColorSequenceKeypoint.new(
+				keypoint.Time,
+				RecolorPreserveHSV(
+					keypoint.Value,
+					requestedColor
+				)
+			)
+		)
 	end
 
-	if not RESIST and effectColor ~= "Default" and typeof(effectColor) == "Color3" then
-		for _, d in ipairs(repentance:GetDescendants()) do
-			if d:IsA("Beam")
-				or d:IsA("ParticleEmitter")
-				or d:IsA("Trail")
-			then
-				local keypoints = {}
+	return ColorSequence.new(keypoints)
+end
 
-				for _, keypoint in ipairs(d.Color.Keypoints) do
-					table.insert(
-						keypoints,
-						ColorSequenceKeypoint.new(
-							keypoint.Time,
-							RecolorPreserveHSV(
-								keypoint.Value,
-								effectColor
-							)
-						)
-					)
-				end
+local function ApplyEffectColor(root, requestedColor)
+	if typeof(requestedColor) ~= "Color3" then
+		return
+	end
 
-				d.Color = ColorSequence.new(keypoints)
+	for _, d in ipairs(root:GetDescendants()) do
 
-			elseif d:IsA("PointLight")
-				or d:IsA("SpotLight")
-				or d:IsA("SurfaceLight")
-			then
-				d.Color = RecolorPreserveHSV(
-					d.Color,
-					effectColor
-				)
-			end
+		-- Beam
+		if d:IsA("Beam") then
+			d.Color = RecolorSequence(
+				d.Color,
+				requestedColor
+			)
+
+		-- ParticleEmitter
+		elseif d:IsA("ParticleEmitter") then
+			d.Color = RecolorSequence(
+				d.Color,
+				requestedColor
+			)
+
+		-- Trail
+		elseif d:IsA("Trail") then
+			d.Color = RecolorSequence(
+				d.Color,
+				requestedColor
+			)
+
+		-- PointLight / SpotLight / SurfaceLight
+		elseif d:IsA("PointLight")
+			or d:IsA("SpotLight")
+			or d:IsA("SurfaceLight")
+		then
+			d.Color = RecolorPreserveHSV(
+				d.Color,
+				requestedColor
+			)
+
+		-- BasePart có Material Neon
+		elseif d:IsA("BasePart")
+			and d.Material == Enum.Material.Neon
+		then
+			d.Color = RecolorPreserveHSV(
+				d.Color,
+				requestedColor
+			)
 		end
 	end
+end
+
+if not RESIST
+	and effectColor ~= "Default"
+	and typeof(effectColor) == "Color3"
+then
+	ApplyEffectColor(
+		repentance,
+		effectColor
+	)
+end
 
 	local crucifix = repentance:FindFirstChild("Crucifix")
 	local pentagram = repentance:FindFirstChild("Pentagram")
