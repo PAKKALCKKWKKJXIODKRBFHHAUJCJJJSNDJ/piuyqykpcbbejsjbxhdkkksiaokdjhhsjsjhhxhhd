@@ -6,8 +6,6 @@ loadstring(game:HttpGet(
 	"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Functions.lua"
 ))()
 
--- bla
-
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
@@ -50,139 +48,28 @@ local function IsAlive(target)
 	return target and target.Parent
 end
 
-local function GetFirstBasePart(target)
-	if target:IsA("BasePart") then
-		return target
-	end
-
-	for _, v in ipairs(target:GetDescendants()) do
-		if v:IsA("BasePart") then
-			return v
-		end
-	end
-
-	return nil
-end
-
-local function IsLookingAtTarget(target, character)
-	local camera = workspace.CurrentCamera
-
-	if not camera then
-		return false
-	end
-
-	local basePart = GetFirstBasePart(target)
-
-	if not basePart then
-		return false
-	end
-
-	local origin = camera.CFrame.Position
-	local direction = basePart.Position - origin
-
-	if direction.Magnitude <= 0 then
-		return true
-	end
-
-	local dot = camera.CFrame.LookVector:Dot(direction.Unit)
-
-	if dot < 0.98 then
-		return false
-	end
-
-	local params = RaycastParams.new()
-	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = {
-		character
-	}
-
-	local result = workspace:Raycast(
-		origin,
-		direction,
-		params
-	)
-
-	if not result then
-		return false
-	end
-
-	return result.Instance == basePart
-end
-
-local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
+local function CrucifixEntity(target, RESIST)
 	RESIST = RESIST == true
-	MaxDistance = MaxDistance or math.huge
-	RequireLook = RequireLook == true
-
+	
 	if not IsAlive(target) then
 		return
 	end
 
-	local tool
+	local tool = character:FindFirstChildOfClass("Tool")
 
-	while IsAlive(target) do
-		character = player.Character or character
-
-		if not character then
-			RunService.RenderStepped:Wait()
-			continue
-		end
-
-		local hrp = character:FindFirstChild("HumanoidRootPart")
-
-		if not hrp then
-			RunService.RenderStepped:Wait()
-			continue
-		end
-
-		local targetPart
-
-		if target:IsA("Model") then
-			targetPart =
-				target:FindFirstChild("HumanoidRootPart")
-				or GetFirstBasePart(target)
-		elseif target:IsA("BasePart") then
-			targetPart = target
-		end
-
-		if not targetPart then
-			return
-		end
-
-		local distance =
-			(hrp.Position - targetPart.Position).Magnitude
-
-		local distanceOK = distance <= MaxDistance
-
-		local lookOK = true
-
-		if RequireLook then
-			lookOK = IsLookingAtTarget(target, character)
-		end
-
-		tool = character:FindFirstChildOfClass("Tool")
-
-		local crucifixOK =
-			tool
-			and tool:IsA("Tool")
-			and tool.Name == "Crucifix"
-
-		if distanceOK and lookOK and crucifixOK then
-			break
-		end
-
-		RunService.RenderStepped:Wait()
-	end
-
-	if not IsAlive(target) then
+	if not tool or tool.Name ~= "Crucifix" then
 		return
 	end
-
-	if not tool or not tool.Parent then
-		return
-	end
-
+	
 	local selectedCrucifix = tool
+
+task.spawn(function()
+	task.wait(0.7)
+
+	if selectedCrucifix and selectedCrucifix.Parent then
+		selectedCrucifix:Destroy()
+	end
+end)
 
 	local targetPivot = GetPivot(target)
 
@@ -254,17 +141,6 @@ local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
 
 	repentance.Parent = workspace
 
-	task.spawn(function()
-		task.wait(0.7)
-
-		if selectedCrucifix
-			and selectedCrucifix.Parent
-			and selectedCrucifix:IsA("Tool")
-		then
-			selectedCrucifix:Destroy()
-		end
-	end)
-
 	local shaker
 
 	pcall(function()
@@ -310,6 +186,7 @@ local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
 
 	sound:Play()
 
+	-- Giữ entity theo EntityPart giống spawner
 	local followConnection = RunService.RenderStepped:Connect(function()
 		if not repentance.Parent then
 			return
@@ -464,6 +341,7 @@ local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
 	if not RESIST then
 		waitUntil(2)
 
+		-- Entity bị kéo xuống 25 studs
 		TweenService:Create(
 			entityPart,
 			TweenInfo.new(
@@ -476,11 +354,10 @@ local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
 			}
 		):Play()
 
+		-- Fade sound của entity
 		if target:IsA("Model") then
 			for _, v in ipairs(target:GetDescendants()) do
-				if v:IsA("Sound")
-					and not v:GetAttribute("VolumeIgnore")
-				then
+				if v:IsA("Sound") and not v:GetAttribute("VolumeIgnore") then
 					TweenService:Create(
 						v,
 						TweenInfo.new(
@@ -597,22 +474,22 @@ local function CrucifixEntity(target, RESIST, MaxDistance, RequireLook)
 	end
 
 	local tween = TweenService:Create(
-		repentance.Crucifix,
-		TweenInfo.new(1),
-		{
-			Size = repentance.Crucifix.Size * 3,
-			Transparency = 1
-		}
-	)
+	repentance.Crucifix,
+	TweenInfo.new(1),
+	{
+		Size = repentance.Crucifix.Size * 3,
+		Transparency = 1
+	}
+)
 
-	task.spawn(function()
-		tween:Play()
-		tween.Completed:Wait()
+task.spawn(function() 
+tween:Play()
+tween.Completed:Wait()
 
-		if target and target.Parent then
-			target:Destroy()
-		end
-	end)
+if target and target.Parent then
+	target:Destroy()
+end
+end) 
 
 	if lightBright then
 		TweenService:Create(
