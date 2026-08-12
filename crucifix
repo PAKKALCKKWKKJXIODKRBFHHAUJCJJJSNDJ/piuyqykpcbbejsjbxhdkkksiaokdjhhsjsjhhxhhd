@@ -6,6 +6,8 @@ loadstring(game:HttpGet(
 	"https://raw.githubusercontent.com/RegularVynixu/Utilities/main/Functions.lua"
 ))()
 
+-- bla
+
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 
