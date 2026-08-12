@@ -164,10 +164,10 @@ local function CrucifixEntity(target, RESIST, maxDistance)
 	entityPart.CFrame = targetPivot
 
 	if bodyPosition then
-		bodyPosition.Position = (
-			targetPivot * CFrame.new(0.5, 3, -6)
-		).Position
-	end
+	bodyPosition.Position = (
+		hrp.CFrame * CFrame.new(0.5, 3, -6)
+	).Position
+end
 
 	repentance.Parent = workspace
 
@@ -504,22 +504,24 @@ local function CrucifixEntity(target, RESIST, maxDistance)
 	end
 
 	local tween = TweenService:Create(
-		repentance.Crucifix,
-		TweenInfo.new(1),
-		{
-			Size = repentance.Crucifix.Size * 3,
-			Transparency = 1
-		}
-	)
+	repentance.Crucifix,
+	TweenInfo.new(1),
+	{
+		Size = repentance.Crucifix.Size * 3,
+		Transparency = 1
+	}
+)
 
-	task.spawn(function() 
-		tween:Play()
-		tween.Completed:Wait()
+task.spawn(function()
+	tween:Play()
+	tween.Completed:Wait()
 
+	if not RESIST then
 		if target and target.Parent then
 			target:Destroy()
 		end
-	end) 
+	end
+end)
 
 	if lightBright then
 		TweenService:Create(
@@ -544,27 +546,35 @@ local function CrucifixEntity(target, RESIST, maxDistance)
 	end
 
 	if not RESIST then
-		if explodeParticle then
-			explodeParticle:Emit(math.random(20, 30))
-		end
-
-		pcall(function()
-			if Main_Game and Main_Game.camShaker then
-				Main_Game.camShaker:ShakeOnce(
-					7.5,
-					7.5,
-					0.25,
-					1.5
-				)
-			end
-		end)
+	if explodeParticle then
+		explodeParticle:Emit(math.random(20, 30))
 	end
 
-	task.delay(5, function()
-		if repentance.Parent then
-			repentance:Destroy()
+	pcall(function()
+		if Main_Game and Main_Game.camShaker then
+			Main_Game.camShaker:ShakeOnce(
+				7.5,
+				7.5,
+				0.25,
+				1.5
+			)
 		end
 	end)
+else
+	if target and target.Parent then
+		target:SetAttribute("BeingBanished", false)
+		target:SetAttribute("Paused", false)
+	end
+
+	fadeOut()
+end
+
+task.delay(5, function()
+	if repentance.Parent then
+		repentance:Destroy()
+	end
+end)
+
 end
 
 return CrucifixEntity
