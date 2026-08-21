@@ -1,0 +1,2345 @@
+--[[
+	Camera Animation Editor - Full VIP Edition (2026)
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local StarterGui = game:GetService("StarterGui")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local playerGui = player:WaitForChild("PlayerGui")
+local updateLayerUI
+local updateCurrentLayer
+local getLastLayer
+local refresh
+
+local FILE = "CameraAnimation.lua"
+
+local tweenTypes = {
+	"Linear",
+	"Sine",
+	"Back",
+	"Quad",
+	"Quart",
+	"Quint",
+	"Bounce",
+	"Elastic",
+	"Exponential",
+	"Circular",
+	"Cubic",
+	"Cut"
+}
+
+local tweenDirections = {
+	"In",
+	"Out",
+	"InOut"
+}
+
+local pendingTweenType = "Linear"
+local pendingTweenDirection = "InOut"
+
+local layers = {
+	[1] = {}
+}
+
+local currentLayer = 1
+local maxKeyframesPerLayer = 10
+
+local keyframes = layers[1]
+local currentTime = 0
+local selectedKey = nil
+local effectFrame
+local effectBox
+local effectsButton
+local playing = false
+local freecam = false
+local playStartLayer = 1
+local guiVisible = true
+
+local camPos = camera.CFrame.Position
+local rx, ry = camera.CFrame:ToOrientation()
+local pitch = rx
+local yaw = ry
+
+local mobileMove = Vector2.zero
+local touchMove, touchLook, lastLook
+
+local savedTransparency = {}
+local hiddenGuiObjects = {}
+local hiddenCoreGuiTypes = {}
+local guiHideConnections = {}
+local guiHidden = false
+
+local function getLayer(index)
+	return layers[index]
+end
+
+local function hideAllGui()
+	if guiHidden then return end
+	guiHidden = true
+
+	table.clear(hiddenGuiObjects)
+	table.clear(hiddenCoreGuiTypes)
+
+	local function saveAndHide(obj)
+		if obj:IsA("ScreenGui") then
+			if hiddenGuiObjects[obj] == nil then
+				hiddenGuiObjects[obj] = {
+					Type = "ScreenGui",
+					Enabled = obj.Enabled
+				}
+			end
+
+			pcall(function()
+				obj.Enabled = false
+			end)
+
+		elseif obj:IsA("GuiObject") then
+			if hiddenGuiObjects[obj] == nil then
+				hiddenGuiObjects[obj] = {
+					Type = "GuiObject",
+					Visible = obj.Visible
+				}
+			end
+
+			pcall(function()
+				obj.Visible = false
+			end)
+		end
+	end
+
+	for _, obj in ipairs(playerGui:GetDescendants()) do
+		saveAndHide(obj)
+	end
+
+	for _, obj in ipairs(playerGui:GetChildren()) do
+		saveAndHide(obj)
+	end
+
+	for _, obj in ipairs(game:GetService("CoreGui"):GetDescendants()) do
+		saveAndHide(obj)
+	end
+
+	for _, type in ipairs(Enum.CoreGuiType:GetEnumItems()) do
+		pcall(function()
+			hiddenCoreGuiTypes[type] = StarterGui:GetCoreGuiEnabled(type)
+			StarterGui:SetCoreGuiEnabled(type, false)
+		end)
+	end
+
+	table.insert(guiHideConnections,
+		playerGui.DescendantAdded:Connect(function(obj)
+			if not guiHidden then return end
+
+			if obj:IsA("ScreenGui") then
+				hiddenGuiObjects[obj] = {
+					Type = "ScreenGui",
+					Enabled = obj.Enabled
+				}
+
+				pcall(function()
+					obj.Enabled = false
+				end)
+
+			elseif obj:IsA("GuiObject") then
+				hiddenGuiObjects[obj] = {
+					Type = "GuiObject",
+					Visible = obj.Visible
+				}
+
+				pcall(function()
+					obj.Visible = false
+				end)
+			end
+		end)
+	)
+
+	table.insert(guiHideConnections,
+		game:GetService("CoreGui").DescendantAdded:Connect(function(obj)
+			if not guiHidden then return end
+
+			if obj:IsA("ScreenGui") then
+				hiddenGuiObjects[obj] = {
+					Type = "ScreenGui",
+					Enabled = obj.Enabled
+				}
+
+				pcall(function()
+					obj.Enabled = false
+				end)
+
+			elseif obj:IsA("GuiObject") then
+				hiddenGuiObjects[obj] = {
+					Type = "GuiObject",
+					Visible = obj.Visible
+				}
+
+				pcall(function()
+					obj.Visible = false
+				end)
+			end
+		end)
+	)
+end
+
+local function restoreAllGui()
+	if not guiHidden then return end
+
+	guiHidden = false
+
+	for _, connection in ipairs(guiHideConnections) do
+		pcall(function()
+			connection:Disconnect()
+		end)
+	end
+
+	table.clear(guiHideConnections)
+
+	for obj, data in pairs(hiddenGuiObjects) do
+		if obj and obj.Parent then
+			pcall(function()
+				if data.Type == "ScreenGui" then
+					obj.Enabled = data.Enabled
+				elseif data.Type == "GuiObject" then
+					obj.Visible = data.Visible
+				end
+			end)
+		end
+	end
+
+	for type, enabled in pairs(hiddenCoreGuiTypes) do
+		pcall(function()
+			StarterGui:SetCoreGuiEnabled(type, enabled)
+		end)
+	end
+
+	table.clear(hiddenGuiObjects)
+	table.clear(hiddenCoreGuiTypes)
+end
+
+local function setFreecamCharacterVisibility(enabled)
+	local character = player.Character
+	if not character then return end
+
+	if enabled then
+		table.clear(savedTransparency)
+
+		for _, obj in ipairs(character:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				if obj.Name == "Head" or obj:FindFirstAncestorOfClass("Accessory") then
+					savedTransparency[obj] = obj.Transparency
+					obj.Transparency = 0
+				end
+			end
+		end
+	else
+		for obj, transparency in pairs(savedTransparency) do
+			if obj and obj.Parent then
+				obj.Transparency = transparency
+			end
+		end
+
+		table.clear(savedTransparency)
+	end
+end
+
+-- Hàm quản lý trạng thái Anchor và Camera Type
+local function updateFreecamState(isFreecam)
+	local character = player.Character or player.CharacterAdded:Wait()
+	local rootPart = character:FindFirstChild("HumanoidRootPart")
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+
+	if rootPart then
+		rootPart.Anchored = isFreecam
+	end
+
+	if humanoid then
+		humanoid.AutoRotate = not isFreecam
+	end
+
+	setFreecamCharacterVisibility(isFreecam)
+
+	if isFreecam then
+		camera.CameraType = Enum.CameraType.Scriptable
+	else
+		camera.CameraType = Enum.CameraType.Custom
+	end
+end
+
+updateFreecamState(freecam)
+
+player.CharacterAdded:Connect(function(char)
+	task.wait(0.5)
+
+	local rootPart = char:FindFirstChild("HumanoidRootPart")
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+	if rootPart then
+		rootPart.Anchored = freecam
+	end
+
+	if humanoid then
+		humanoid.AutoRotate = not freecam
+	end
+end)
+
+-- ==================== VIP UI & ANIMATION CREATION ====================
+local gui = Instance.new("ScreenGui")
+gui.Name = "CameraAnimationEditor"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+local main = Instance.new("Frame")
+main.Size = UDim2.fromOffset(470, 285)
+main.Position = UDim2.new(0.5, -235, 0.5, -142)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 12)
+
+-- Viền Gradient phát sáng cho Main Frame
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Thickness = 2
+mainStroke.Color = Color3.fromRGB(255, 255, 255)
+mainStroke.Parent = main
+
+local mainGradient = Instance.new("UIGradient")
+mainGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(138, 43, 226)),
+	ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 206, 209)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 105, 180))
+})
+mainGradient.Rotation = 45
+mainGradient.Parent = mainStroke
+
+-- Hiệu ứng Animated Color cho Viền
+-- Hiệu ứng Animated Color cho Viền (Có dừng khi ẩn GUI để tối ưu hiệu năng)
+task.spawn(function()
+	while true do
+		if guiVisible then
+			for i = 0, 360, 2 do
+				if not guiVisible then break end
+				mainGradient.Rotation = i
+				task.wait(0.05)
+			end
+		end
+		task.wait(0.5)
+	end
+end)
+
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 40)
+title.BackgroundTransparency = 1
+title.Text = "GUESTLY Camera Animation Editor"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
+
+local timeline = Instance.new("Frame")
+timeline.Position = UDim2.fromOffset(15, 45)
+timeline.Size = UDim2.new(1, -30, 0, 75)
+timeline.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+timeline.BorderSizePixel = 0
+timeline.Parent = main
+
+Instance.new("UICorner", timeline).CornerRadius = UDim.new(0, 8)
+
+local timeLabel = Instance.new("TextLabel")
+timeLabel.Position = UDim2.fromOffset(12, 6)
+timeLabel.Size = UDim2.fromOffset(180, 25)
+timeLabel.BackgroundTransparency = 1
+timeLabel.Text = "Time: 0.00 | Keys: 0"
+timeLabel.TextColor3 = Color3.fromRGB(200, 200, 220)
+timeLabel.Font = Enum.Font.GothamMedium
+timeLabel.TextSize = 12
+timeLabel.TextXAlignment = Enum.TextXAlignment.Left
+timeLabel.Parent = timeline
+
+local timeBox = Instance.new("TextBox")
+timeBox.Position = UDim2.fromOffset(385, 6)
+timeBox.Size = UDim2.fromOffset(65, 25)
+timeBox.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+timeBox.Text = "0"
+timeBox.TextColor3 = Color3.new(1, 1, 1)
+timeBox.Font = Enum.Font.GothamMedium
+timeBox.TextSize = 12
+timeBox.ClearTextOnFocus = false
+timeBox.Parent = timeline
+Instance.new("UICorner", timeBox).CornerRadius = UDim.new(0, 6)
+
+local layerCountLabel = Instance.new("TextLabel")
+layerCountLabel.Position = UDim2.fromOffset(195, 6)
+layerCountLabel.Size = UDim2.fromOffset(35, 25)
+layerCountLabel.BackgroundTransparency = 1
+layerCountLabel.Text = "1"
+layerCountLabel.TextColor3 = Color3.fromRGB(150, 150, 180)
+layerCountLabel.Font = Enum.Font.GothamBold
+layerCountLabel.TextSize = 11
+layerCountLabel.TextXAlignment = Enum.TextXAlignment.Right
+layerCountLabel.Parent = timeline
+
+local layerLeft = Instance.new("TextButton")
+layerLeft.Position = UDim2.fromOffset(235, 4)
+layerLeft.Size = UDim2.fromOffset(28, 28)
+layerLeft.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+layerLeft.Text = "<"
+layerLeft.TextColor3 = Color3.new(1, 1, 1)
+layerLeft.Font = Enum.Font.GothamBold
+layerLeft.TextSize = 14
+layerLeft.BorderSizePixel = 0
+layerLeft.Parent = timeline
+
+Instance.new("UICorner", layerLeft).CornerRadius = UDim.new(0, 5)
+
+local layerLabel = Instance.new("TextButton")
+layerLabel.Position = UDim2.fromOffset(267, 4)
+layerLabel.Size = UDim2.fromOffset(80, 28)
+layerLabel.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+layerLabel.Text = "Layer 1"
+layerLabel.TextColor3 = Color3.new(1, 1, 1)
+layerLabel.Font = Enum.Font.GothamBold
+layerLabel.TextSize = 11
+layerLabel.BorderSizePixel = 0
+layerLabel.Parent = timeline
+
+Instance.new("UICorner", layerLabel).CornerRadius = UDim.new(0, 5)
+
+local layerRight = Instance.new("TextButton")
+layerRight.Position = UDim2.fromOffset(351, 4)
+layerRight.Size = UDim2.fromOffset(28, 28)
+layerRight.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+layerRight.Text = ">"
+layerRight.TextColor3 = Color3.new(1, 1, 1)
+layerRight.Font = Enum.Font.GothamBold
+layerRight.TextSize = 14
+layerRight.BorderSizePixel = 0
+layerRight.Parent = timeline
+
+Instance.new("UICorner", layerRight).CornerRadius = UDim.new(0, 5)
+
+local line = Instance.new("Frame")
+line.Position = UDim2.new(0, 12, 0, 50)
+line.Size = UDim2.new(1, -24, 0, 3)
+line.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+line.BorderSizePixel = 0
+line.Parent = timeline
+Instance.new("UICorner", line).CornerRadius = UDim.new(1, 0)
+
+local keysFrame = Instance.new("Frame")
+keysFrame.Position = line.Position
+keysFrame.Size = line.Size
+keysFrame.BackgroundTransparency = 1
+keysFrame.Parent = timeline
+
+local scrubber = Instance.new("Frame")
+scrubber.Name = "Scrubber"
+scrubber.Size = UDim2.fromOffset(4, 18)
+scrubber.AnchorPoint = Vector2.new(0.5, 0.5)
+scrubber.Position = UDim2.new(0, 0, 0.5, 0)
+scrubber.BackgroundColor3 = Color3.new(1, 1, 1)
+scrubber.BorderSizePixel = 0
+scrubber.ZIndex = 6
+scrubber.Parent = keysFrame
+
+Instance.new("UICorner", scrubber).CornerRadius = UDim.new(1, 0)
+
+local scrubberGrad = Instance.new("UIGradient")
+scrubberGrad.Color = ColorSequence.new(Color3.fromRGB(0, 255, 200), Color3.fromRGB(255, 0, 128))
+scrubberGrad.Parent = scrubber
+
+-- Hàm tạo button chuẩn VIP có hiệu ứng hover mượt mà & animation scale
+local function button(text, x, y, w, isGradient)
+	local b = Instance.new("TextButton")
+	b.Position = UDim2.fromOffset(x, y)
+	b.Size = UDim2.fromOffset(w, 36)
+	b.BackgroundColor3 = isGradient and Color3.new(1, 1, 1) or Color3.fromRGB(35, 35, 45)
+	b.Text = text
+	b.TextColor3 = Color3.new(1, 1, 1)
+	b.Font = Enum.Font.GothamBold
+	b.TextSize = 11
+	b.BorderSizePixel = 0
+	b.AutoButtonColor = false
+	b.Parent = main
+
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(60, 60, 80)
+	stroke.Thickness = 1
+	stroke.Parent = b
+
+	if isGradient then
+		local grad = Instance.new("UIGradient")
+		grad.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(138, 43, 226)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 206, 209))
+		})
+		grad.Parent = b
+	end
+
+	-- Hiệu ứng Hover Smooth Scale
+	b.MouseEnter:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.fromOffset(w + 4, 38),
+			Position = UDim2.fromOffset(x - 2, y - 1)
+		}):Play()
+	end)
+
+	b.MouseLeave:Connect(function()
+		TweenService:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.fromOffset(w, 36),
+			Position = UDim2.fromOffset(x, y)
+		}):Play()
+	end)
+
+	return b
+end
+
+local create = button("Create Keyframe", 15, 135, 115, true)
+local play = button("Play", 138, 135, 75, false)
+local stop = button("Stop", 221, 135, 75, false)
+local freecamButton = button("Freecam: OFF", 304, 135, 121, false)
+
+local export = button("Export", 15, 178, 115, false)
+local import = button("Import", 138, 178, 75, false)
+local delete = button("Delete", 221, 178, 75, false)
+
+local speedBox = Instance.new("TextBox")
+speedBox.Position = UDim2.fromOffset(304, 178)
+speedBox.Size = UDim2.fromOffset(121, 36)
+speedBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+speedBox.Text = "Speed 1"
+speedBox.TextColor3 = Color3.new(1, 1, 1)
+speedBox.Font = Enum.Font.GothamMedium
+speedBox.TextSize = 11
+speedBox.ClearTextOnFocus = false
+speedBox.BorderSizePixel = 0
+speedBox.Parent = main
+
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 6)
+
+local effectsButton = button("Effects", 221, 222, 75, false)
+effectsButton.Visible = false
+
+local tweenButton = button("Tween: Linear", 304, 222, 121, false)
+
+local optionButtons = {
+	create,
+	play,
+	stop,
+	export,
+	import,
+	delete,
+	speedBox,
+	tweenButton,
+	effectsButton
+}
+
+local function notify(text)
+	pcall(function()
+		game:GetService("StarterGui"):SetCore("SendNotification", {
+			Title = "Camera Animation Editor",
+			Text = text,
+			Duration = 3
+		})
+	end)
+end
+
+local overlay = Instance.new("Frame")
+overlay.Size = UDim2.fromScale(1, 1)
+overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+overlay.BackgroundTransparency = 0.5
+overlay.Visible = false
+overlay.ZIndex = 200
+overlay.Parent = gui
+
+local saveFrame = Instance.new("Frame")
+saveFrame.Size = UDim2.fromOffset(340, 195)
+saveFrame.Position = UDim2.new(0.5, -170, 0.5, -97)
+saveFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+saveFrame.BorderSizePixel = 0
+saveFrame.ZIndex = 201
+saveFrame.Parent = overlay
+
+local saveClose = Instance.new("TextButton")
+saveClose.Size = UDim2.fromOffset(30, 30)
+saveClose.Position = UDim2.new(1, -40, 0, 10)
+saveClose.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+saveClose.Text = "X"
+saveClose.TextColor3 = Color3.new(1, 1, 1)
+saveClose.Font = Enum.Font.GothamBold
+saveClose.TextSize = 12
+saveClose.BorderSizePixel = 0
+saveClose.ZIndex = 203
+saveClose.Parent = saveFrame
+
+Instance.new("UICorner", saveClose).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", saveFrame).CornerRadius = UDim.new(0, 10)
+
+local saveTitle = Instance.new("TextLabel")
+saveTitle.Size = UDim2.new(1, -30, 0, 35)
+saveTitle.Position = UDim2.fromOffset(15, 15)
+saveTitle.BackgroundTransparency = 1
+saveTitle.Text = "Enter your animation name"
+saveTitle.TextColor3 = Color3.new(1, 1, 1)
+saveTitle.Font = Enum.Font.GothamBold
+saveTitle.TextSize = 15
+saveTitle.ZIndex = 202
+saveTitle.Parent = saveFrame
+
+local nameBox = Instance.new("TextBox")
+nameBox.Size = UDim2.new(1, -30, 0, 42)
+nameBox.Position = UDim2.fromOffset(15, 65)
+nameBox.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+nameBox.TextColor3 = Color3.new(1, 1, 1)
+nameBox.PlaceholderText = "Animation name..."
+nameBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+nameBox.Text = ""
+nameBox.Font = Enum.Font.GothamMedium
+nameBox.TextSize = 12
+nameBox.ClearTextOnFocus = false
+nameBox.BorderSizePixel = 0
+nameBox.ZIndex = 202
+nameBox.Parent = saveFrame
+
+Instance.new("UICorner", nameBox).CornerRadius = UDim.new(0, 6)
+
+local saveButton = Instance.new("TextButton")
+saveButton.Size = UDim2.new(1, -30, 0, 42)
+saveButton.Position = UDim2.fromOffset(15, 120)
+saveButton.BackgroundColor3 = Color3.fromRGB(0, 206, 209)
+saveButton.Text = "Save"
+saveButton.TextColor3 = Color3.new(1, 1, 1)
+saveButton.Font = Enum.Font.GothamBold
+saveButton.TextSize = 12
+saveButton.BorderSizePixel = 0
+saveButton.ZIndex = 202
+saveButton.Parent = saveFrame
+
+Instance.new("UICorner", saveButton).CornerRadius = UDim.new(0, 6)
+
+local importFrame = Instance.new("Frame")
+importFrame.Size = UDim2.fromOffset(360, 310)
+importFrame.Position = UDim2.new(0.5, -180, 0.5, -155)
+importFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+importFrame.BorderSizePixel = 0
+importFrame.Visible = false
+importFrame.ZIndex = 200
+importFrame.Parent = overlay
+
+local importClose = Instance.new("TextButton")
+importClose.Size = UDim2.fromOffset(30, 30)
+importClose.Position = UDim2.new(1, -40, 0, 10)
+importClose.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+importClose.Text = "X"
+importClose.TextColor3 = Color3.new(1, 1, 1)
+importClose.Font = Enum.Font.GothamBold
+importClose.TextSize = 12
+importClose.BorderSizePixel = 0
+importClose.ZIndex = 203
+importClose.Parent = importFrame
+
+Instance.new("UICorner", importClose).CornerRadius = UDim.new(0, 6)
+Instance.new("UICorner", importFrame).CornerRadius = UDim.new(0, 10)
+
+local importTitle = Instance.new("TextLabel")
+importTitle.Size = UDim2.new(1, -30, 0, 35)
+importTitle.Position = UDim2.fromOffset(15, 10)
+importTitle.BackgroundTransparency = 1
+importTitle.Text = "Saved Animations"
+importTitle.TextColor3 = Color3.new(1, 1, 1)
+importTitle.Font = Enum.Font.GothamBold
+importTitle.TextSize = 15
+importTitle.ZIndex = 201
+importTitle.Parent = importFrame
+
+local animationList = Instance.new("ScrollingFrame")
+animationList.Size = UDim2.new(1, -20, 1, -55)
+animationList.Position = UDim2.fromOffset(10, 48)
+animationList.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+animationList.BorderSizePixel = 0
+animationList.ScrollBarThickness = 4
+animationList.CanvasSize = UDim2.new()
+animationList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+animationList.ZIndex = 201
+animationList.Parent = importFrame
+
+Instance.new("UICorner", animationList).CornerRadius = UDim.new(0, 6)
+
+local animationLayout = Instance.new("UIListLayout")
+animationLayout.Padding = UDim.new(0, 5)
+animationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+animationLayout.Parent = animationList
+
+local confirmFrame = Instance.new("Frame")
+confirmFrame.Size = UDim2.fromOffset(360, 165)
+confirmFrame.Position = UDim2.new(0.5, -180, 0.5, -82)
+confirmFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+confirmFrame.BorderSizePixel = 0
+confirmFrame.Visible = false
+confirmFrame.ZIndex = 210
+confirmFrame.Parent = overlay
+
+local deleteFrame = Instance.new("Frame")
+deleteFrame.Size = UDim2.fromOffset(360, 190)
+deleteFrame.Position = UDim2.new(0.5, -180, 0.5, -95)
+deleteFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+deleteFrame.BorderSizePixel = 0
+deleteFrame.Visible = false
+deleteFrame.ZIndex = 220
+deleteFrame.Parent = overlay
+
+Instance.new("UICorner", deleteFrame).CornerRadius = UDim.new(0, 10)
+
+local deleteTitle = Instance.new("TextLabel")
+deleteTitle.Size = UDim2.new(1, -30, 0, 50)
+deleteTitle.Position = UDim2.fromOffset(15, 10)
+deleteTitle.BackgroundTransparency = 1
+deleteTitle.Text = "Which keyframe do you want to delete?"
+deleteTitle.TextColor3 = Color3.new(1, 1, 1)
+deleteTitle.Font = Enum.Font.GothamBold
+deleteTitle.TextSize = 13
+deleteTitle.TextWrapped = true
+deleteTitle.ZIndex = 221
+deleteTitle.Parent = deleteFrame
+
+local selectedDeleteButton = Instance.new("TextButton")
+selectedDeleteButton.Size = UDim2.fromOffset(150, 45)
+selectedDeleteButton.Position = UDim2.fromOffset(20, 75)
+selectedDeleteButton.BackgroundColor3 = Color3.fromRGB(0, 206, 209)
+selectedDeleteButton.Text = "Selected keyframe"
+selectedDeleteButton.TextColor3 = Color3.new(1, 1, 1)
+selectedDeleteButton.Font = Enum.Font.GothamBold
+selectedDeleteButton.TextSize = 11
+selectedDeleteButton.BorderSizePixel = 0
+selectedDeleteButton.ZIndex = 221
+selectedDeleteButton.Parent = deleteFrame
+
+Instance.new("UICorner", selectedDeleteButton).CornerRadius = UDim.new(0, 6)
+
+local allDeleteButton = Instance.new("TextButton")
+allDeleteButton.Size = UDim2.fromOffset(150, 45)
+allDeleteButton.Position = UDim2.fromOffset(190, 75)
+allDeleteButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+allDeleteButton.Text = "All keyframes"
+allDeleteButton.TextColor3 = Color3.new(1, 1, 1)
+allDeleteButton.Font = Enum.Font.GothamBold
+allDeleteButton.TextSize = 11
+allDeleteButton.BorderSizePixel = 0
+allDeleteButton.ZIndex = 221
+allDeleteButton.Parent = deleteFrame
+
+Instance.new("UICorner", allDeleteButton).CornerRadius = UDim.new(0, 6)
+
+local deleteCancelButton = Instance.new("TextButton")
+deleteCancelButton.Size = UDim2.fromOffset(320, 35)
+deleteCancelButton.Position = UDim2.fromOffset(20, 135)
+deleteCancelButton.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+deleteCancelButton.Text = "Cancel"
+deleteCancelButton.TextColor3 = Color3.new(1, 1, 1)
+deleteCancelButton.Font = Enum.Font.GothamBold
+deleteCancelButton.TextSize = 11
+deleteCancelButton.BorderSizePixel = 0
+deleteCancelButton.ZIndex = 221
+deleteCancelButton.Parent = deleteFrame
+
+Instance.new("UICorner", deleteCancelButton).CornerRadius = UDim.new(0, 6)
+
+Instance.new("UICorner", confirmFrame).CornerRadius = UDim.new(0, 10)
+
+local confirmText = Instance.new("TextLabel")
+confirmText.Size = UDim2.new(1, -30, 0, 70)
+confirmText.Position = UDim2.fromOffset(15, 15)
+confirmText.BackgroundTransparency = 1
+confirmText.TextColor3 = Color3.new(1, 1, 1)
+confirmText.Font = Enum.Font.GothamBold
+confirmText.TextSize = 13
+confirmText.TextWrapped = true
+confirmText.ZIndex = 211
+confirmText.Parent = confirmFrame
+
+local yesButton = Instance.new("TextButton")
+yesButton.Size = UDim2.fromOffset(140, 40)
+yesButton.Position = UDim2.fromOffset(30, 105)
+yesButton.BackgroundColor3 = Color3.fromRGB(0, 206, 209)
+yesButton.Text = "Yes"
+yesButton.TextColor3 = Color3.new(1, 1, 1)
+yesButton.Font = Enum.Font.GothamBold
+yesButton.TextSize = 12
+yesButton.BorderSizePixel = 0
+yesButton.ZIndex = 211
+yesButton.Parent = confirmFrame
+
+Instance.new("UICorner", yesButton).CornerRadius = UDim.new(0, 6)
+
+local noButton = Instance.new("TextButton")
+noButton.Size = UDim2.fromOffset(140, 40)
+noButton.Position = UDim2.fromOffset(190, 105)
+noButton.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
+noButton.Text = "No"
+noButton.TextColor3 = Color3.new(1, 1, 1)
+noButton.Font = Enum.Font.GothamBold
+noButton.TextSize = 12
+noButton.BorderSizePixel = 0
+noButton.ZIndex = 211
+noButton.Parent = confirmFrame
+
+Instance.new("UICorner", noButton).CornerRadius = UDim.new(0, 6)
+
+local selectedAnimationFile
+local selectedDeleteFile
+local confirmAction
+local deleteMode
+
+local tweenPanel = Instance.new("Frame")
+tweenPanel.Size = UDim2.fromOffset(160, 200)
+tweenPanel.Position = UDim2.new(1, 5, 0, 35)
+tweenPanel.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+tweenPanel.BorderSizePixel = 0
+tweenPanel.Visible = false
+tweenPanel.ZIndex = 50
+tweenPanel.Parent = main
+
+Instance.new("UICorner", tweenPanel).CornerRadius = UDim.new(0, 8)
+
+local tweenScroll = Instance.new("ScrollingFrame")
+tweenScroll.Position = UDim2.fromOffset(5, 5)
+tweenScroll.Size = UDim2.new(1, -10, 1, -10)
+tweenScroll.BackgroundTransparency = 1
+tweenScroll.BorderSizePixel = 0
+tweenScroll.ScrollBarThickness = 4
+tweenScroll.CanvasSize = UDim2.new()
+tweenScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+tweenScroll.ZIndex = 51
+tweenScroll.Parent = tweenPanel
+
+local tweenLayout = Instance.new("UIListLayout")
+tweenLayout.Padding = UDim.new(0, 4)
+tweenLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tweenLayout.Parent = tweenScroll
+
+local effectFrame = Instance.new("Frame")
+effectFrame.Size = UDim2.fromOffset(380, 260)
+effectFrame.Position = UDim2.new(0.5, -190, 0.5, -130)
+effectFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
+effectFrame.BorderSizePixel = 0
+effectFrame.Visible = false
+effectFrame.ZIndex = 230
+effectFrame.Parent = gui
+
+Instance.new("UICorner", effectFrame).CornerRadius = UDim.new(0, 10)
+
+local effectTitle = Instance.new("TextLabel")
+effectTitle.Size = UDim2.new(1, -60, 0, 40)
+effectTitle.Position = UDim2.fromOffset(15, 8)
+effectTitle.BackgroundTransparency = 1
+effectTitle.Text = "Keyframe Effects"
+effectTitle.TextColor3 = Color3.new(1, 1, 1)
+effectTitle.Font = Enum.Font.GothamBold
+effectTitle.TextSize = 14
+effectTitle.TextXAlignment = Enum.TextXAlignment.Left
+effectTitle.ZIndex = 231
+effectTitle.Parent = effectFrame
+
+local effectClose = Instance.new("TextButton")
+effectClose.Size = UDim2.fromOffset(30, 30)
+effectClose.Position = UDim2.new(1, -40, 0, 10)
+effectClose.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+effectClose.Text = "X"
+effectClose.TextColor3 = Color3.new(1, 1, 1)
+effectClose.Font = Enum.Font.GothamBold
+effectClose.TextSize = 12
+effectClose.BorderSizePixel = 0
+effectClose.ZIndex = 232
+effectClose.Parent = effectFrame
+
+Instance.new("UICorner", effectClose).CornerRadius = UDim.new(0, 6)
+
+effectBox = Instance.new("TextBox")
+effectBox.Size = UDim2.new(1, -30, 0, 145)
+effectBox.Position = UDim2.fromOffset(15, 52)
+effectBox.BackgroundColor3 = Color3.fromRGB(12, 12, 16)
+effectBox.TextColor3 = Color3.new(1, 1, 1)
+effectBox.PlaceholderText = "Insert your effect scripts here"
+effectBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 140)
+effectBox.Text = ""
+effectBox.Font = Enum.Font.Code
+effectBox.TextSize = 12
+effectBox.TextWrapped = false
+effectBox.TextXAlignment = Enum.TextXAlignment.Left
+effectBox.TextYAlignment = Enum.TextYAlignment.Top
+effectBox.MultiLine = true
+effectBox.ClearTextOnFocus = false
+effectBox.BorderSizePixel = 0
+effectBox.ZIndex = 231
+effectBox.Parent = effectFrame
+
+Instance.new("UICorner", effectBox).CornerRadius = UDim.new(0, 6)
+
+local effectInsert = Instance.new("TextButton")
+effectInsert.Size = UDim2.new(1, -30, 0, 40)
+effectInsert.Position = UDim2.fromOffset(15, 207)
+effectInsert.BackgroundColor3 = Color3.fromRGB(0, 206, 209)
+effectInsert.Text = "Insert"
+effectInsert.TextColor3 = Color3.new(1, 1, 1)
+effectInsert.Font = Enum.Font.GothamBold
+effectInsert.TextSize = 12
+effectInsert.BorderSizePixel = 0
+effectInsert.ZIndex = 231
+effectInsert.Parent = effectFrame
+
+Instance.new("UICorner", effectInsert).CornerRadius = UDim.new(0, 6)
+
+local function updateEffectsButton()
+	if selectedKey and keyframes[selectedKey] then
+		effectsButton.Visible = true
+	else
+		effectsButton.Visible = false
+		effectFrame.Visible = false
+	end
+end
+
+importClose.MouseButton1Click:Connect(function()
+	importFrame.Visible = false
+	confirmFrame.Visible = false
+	overlay.Visible = false
+	selectedAnimationFile = nil
+	selectedDeleteFile = nil
+	confirmAction = nil
+end)
+
+saveClose.MouseButton1Click:Connect(function()
+	saveFrame.Visible = false
+	overlay.Visible = false
+	nameBox:ReleaseFocus()
+end)
+
+local function updateOptionButtons()
+	local enabled = freecam
+
+	for _, obj in ipairs(optionButtons) do
+		if obj:IsA("GuiButton") then
+			obj.Interactable = enabled
+			obj.AutoButtonColor = enabled
+
+			if enabled then
+				obj.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+				obj.TextColor3 = Color3.new(1, 1, 1)
+			else
+				obj.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+				obj.TextColor3 = Color3.fromRGB(70, 70, 90)
+			end
+
+		elseif obj:IsA("TextBox") then
+			obj.TextEditable = enabled
+
+			if enabled then
+				obj.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+				obj.TextColor3 = Color3.new(1, 1, 1)
+			else
+				obj.BackgroundColor3 = Color3.fromRGB(15, 15, 20)
+				obj.TextColor3 = Color3.fromRGB(70, 70, 90)
+			end
+		end
+	end
+
+	if not enabled then
+		tweenPanel.Visible = false
+	end
+end
+
+local function setTween(style, direction)
+	pendingTweenType = style
+	pendingTweenDirection = direction
+
+	if selectedKey and keyframes[selectedKey] then
+		keyframes[selectedKey].Tween = style
+		keyframes[selectedKey].Direction = direction
+	end
+
+	tweenButton.Text = "Tween: " .. style .. " " .. direction
+	tweenPanel.Visible = false
+
+	refresh()
+end
+
+for _, tweenName in ipairs(tweenTypes) do
+	if tweenName == "Cut" then
+		local tweenTypeButton = Instance.new("TextButton")
+
+		tweenTypeButton.Size = UDim2.new(1, -4, 0, 30)
+		tweenTypeButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+		tweenTypeButton.Text = "Cut"
+		tweenTypeButton.TextColor3 = Color3.new(1, 1, 1)
+		tweenTypeButton.Font = Enum.Font.GothamMedium
+		tweenTypeButton.TextSize = 11
+		tweenTypeButton.BorderSizePixel = 0
+		tweenTypeButton.ZIndex = 52
+		tweenTypeButton.Parent = tweenScroll
+
+		Instance.new("UICorner", tweenTypeButton).CornerRadius = UDim.new(0, 4)
+
+		tweenTypeButton.MouseButton1Click:Connect(function()
+			setTween("Cut", "InOut")
+		end)
+	else
+		for _, directionName in ipairs(tweenDirections) do
+			local tweenTypeButton = Instance.new("TextButton")
+
+			tweenTypeButton.Size = UDim2.new(1, -4, 0, 30)
+			tweenTypeButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+			tweenTypeButton.Text = tweenName .. " " .. directionName
+			tweenTypeButton.TextColor3 = Color3.new(1, 1, 1)
+			tweenTypeButton.Font = Enum.Font.GothamMedium
+			tweenTypeButton.TextSize = 11
+			tweenTypeButton.BorderSizePixel = 0
+			tweenTypeButton.ZIndex = 52
+			tweenTypeButton.Parent = tweenScroll
+
+			Instance.new("UICorner", tweenTypeButton).CornerRadius = UDim.new(0, 4)
+
+			tweenTypeButton.MouseButton1Click:Connect(function()
+				setTween(tweenName, directionName)
+			end)
+		end
+	end
+end
+
+tweenButton.MouseButton1Click:Connect(function()
+	if not freecam or playing then
+		return
+	end
+
+	tweenPanel.Visible = not tweenPanel.Visible
+end)
+
+local status = Instance.new("TextLabel")
+status.Position = UDim2.fromOffset(15, 222)
+status.Size = UDim2.new(1, -150, 0, 36)
+status.BackgroundTransparency = 1
+status.Text = "Freecam disabled"
+status.TextColor3 = Color3.fromRGB(150, 150, 180)
+status.Font = Enum.Font.GothamMedium
+status.TextSize = 11
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Parent = main
+
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.fromOffset(35, 55)
+toggle.Position = UDim2.new(0, 0, 0.5, -28)
+toggle.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
+toggle.Text = "GUI"
+toggle.TextColor3 = Color3.new(1, 1, 1)
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 11
+toggle.BorderSizePixel = 0
+toggle.ZIndex = 100
+toggle.Parent = gui
+
+Instance.new("UICorner", toggle).CornerRadius = UDim.new(0, 6)
+
+local toggleStroke = Instance.new("UIStroke")
+toggleStroke.Color = Color3.fromRGB(0, 206, 209)
+toggleStroke.Thickness = 1
+toggleStroke.Parent = toggle
+
+local mobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+
+-- Joystick Mobile
+local joystick = Instance.new("Frame")
+joystick.Size = UDim2.fromOffset(130, 130)
+joystick.Position = UDim2.new(0, 45, 1, -165)
+joystick.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+joystick.BackgroundTransparency = 0.88
+joystick.Visible = false
+joystick.BorderSizePixel = 0
+joystick.ZIndex = 20
+joystick.Parent = gui
+
+effectsButton.MouseButton1Click:Connect(function()
+	if not freecam or playing then
+		return
+	end
+
+	if not selectedKey or not keyframes[selectedKey] then
+		return
+	end
+
+	local key = keyframes[selectedKey]
+
+	effectBox.Text = key.Effect or ""
+
+	effectFrame.Visible = true
+	tweenPanel.Visible = false
+end)
+
+effectClose.MouseButton1Click:Connect(function()
+	effectFrame.Visible = false
+	effectBox:ReleaseFocus()
+end)
+
+effectInsert.MouseButton1Click:Connect(function()
+	if not selectedKey or not keyframes[selectedKey] then
+		return
+	end
+
+	local key = keyframes[selectedKey]
+
+	key.Effect = effectBox.Text
+
+	effectFrame.Visible = false
+	effectBox:ReleaseFocus()
+
+	refresh()
+	status.Text = effectBox.Text ~= "" and "Effect inserted" or "Effect removed"
+end)
+
+Instance.new("UICorner", joystick).CornerRadius = UDim.new(1, 0)
+
+local stick = Instance.new("Frame")
+stick.Size = UDim2.fromOffset(55, 55)
+stick.Position = UDim2.new(0.5, -27.5, 0.5, -27.5)
+stick.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+stick.BackgroundTransparency = 0.65
+stick.BorderSizePixel = 0
+stick.ZIndex = 21
+stick.Parent = joystick
+
+updateCurrentLayer = function()
+	keyframes = layers[currentLayer]
+
+	selectedKey = nil
+effectFrame.Visible = false
+updateEffectsButton()
+
+currentTime = 0
+	timeBox.Text = "0"
+	pendingTweenType = "Linear"
+	pendingTweenDirection = "InOut"
+	tweenButton.Text = "Tween: Linear InOut"
+
+	refresh()
+	updateLayerUI()
+end
+
+
+getLastLayer = function()
+	local highest = 0
+
+	for index in pairs(layers) do
+		if index > highest then
+			highest = index
+		end
+	end
+
+	return highest
+end
+
+local function createLayer(index)
+	if not layers[index] then
+		layers[index] = {}
+	end
+end
+
+local function switchLayer(index)
+	if index < 1 then
+		return
+	end
+
+	createLayer(index)
+
+	currentLayer = index
+	updateCurrentLayer()
+end
+
+updateLayerUI = function()
+	layerLabel.Text = "Layer " .. currentLayer
+	layerCountLabel.Text = tostring(getLastLayer())
+
+	layerLeft.Interactable = currentLayer > 1
+	layerLeft.TextColor3 =
+		currentLayer > 1
+		and Color3.new(1, 1, 1)
+		or Color3.fromRGB(80, 80, 90)
+
+	layerRight.Interactable = true
+end
+
+layerLeft.MouseButton1Click:Connect(function()
+	if currentLayer > 1 then
+		switchLayer(currentLayer - 1)
+		updateLayerUI()
+	end
+end)
+
+layerRight.MouseButton1Click:Connect(function()
+	local nextLayer = currentLayer + 1
+
+	if not layers[nextLayer] then
+		layers[nextLayer] = {}
+	end
+
+	switchLayer(nextLayer)
+	updateLayerUI()
+end)
+
+Instance.new("UICorner", stick).CornerRadius = UDim.new(1, 0)
+
+local function resetStick()
+	stick.Position = UDim2.new(0.5, -27.5, 0.5, -27.5)
+	mobileMove = Vector2.zero
+end
+
+local function updateStick(pos)
+	local center = joystick.AbsolutePosition + joystick.AbsoluteSize / 2
+	local delta = Vector2.new(pos.X, pos.Y) - center
+	local radius = joystick.AbsoluteSize.X / 2 - 27.5
+
+	if delta.Magnitude > radius then
+		delta = delta.Unit * radius
+	end
+
+	stick.Position = UDim2.new(0.5, delta.X - 27.5, 0.5, delta.Y - 27.5)
+	mobileMove = Vector2.new(delta.X / radius, delta.Y / radius)
+end
+
+joystick.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch then
+		touchMove = input
+		updateStick(input.Position)
+	end
+end)
+
+joystick.InputChanged:Connect(function(input)
+	if input == touchMove and input.UserInputType == Enum.UserInputType.Touch then
+		updateStick(input.Position)
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == touchMove and input.UserInputType == Enum.UserInputType.Touch then
+		updateStick(input.Position)
+	end
+
+	if input == touchLook and input.UserInputType == Enum.UserInputType.Touch then
+		local delta = input.Position - lastLook
+		lastLook = input.Position
+
+		yaw -= delta.X * 0.004
+		pitch = math.clamp(pitch - delta.Y * 0.004, -1.5, 1.5)
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input == touchMove then
+		touchMove = nil
+		resetStick()
+	end
+
+	if input == touchLook then
+		touchLook = nil
+		lastLook = nil
+	end
+end)
+
+UIS.TouchStarted:Connect(function(touch)
+	if not mobile or not freecam or playing then return end
+	local pos = touch.Position
+
+	if pos.X < camera.ViewportSize.X * 0.5 then return end
+	if pos.Y > camera.ViewportSize.Y - 190 then return end
+
+	touchLook = touch
+	lastLook = pos
+end)
+
+-- Hiệu ứng Fade In / Fade Out khi bật/tắt menu bằng nút GUI
+toggle.MouseButton1Click:Connect(function()
+	guiVisible = not guiVisible
+	toggle.Text = guiVisible and "GUI" or "SHOW"
+
+	local targetSize = guiVisible and UDim2.fromOffset(470, 285) or UDim2.fromOffset(0, 0)
+	local targetTransparency = guiVisible and 0 or 1
+
+	if guiVisible then
+		main.Visible = true
+	end
+
+	TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+		Size = targetSize,
+		BackgroundTransparency = targetTransparency
+	}):Play()
+
+	task.delay(0.3, function()
+		if not guiVisible then
+			main.Visible = false
+		end
+	end)
+end)
+
+local keys = {}
+
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.W then keys.W = true end
+	if input.KeyCode == Enum.KeyCode.A then keys.A = true end
+	if input.KeyCode == Enum.KeyCode.S then keys.S = true end
+	if input.KeyCode == Enum.KeyCode.D then keys.D = true end
+	if input.KeyCode == Enum.KeyCode.Q then keys.Q = true end
+	if input.KeyCode == Enum.KeyCode.E then keys.E = true end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.KeyCode == Enum.KeyCode.W then keys.W = false end
+	if input.KeyCode == Enum.KeyCode.A then keys.A = false end
+	if input.KeyCode == Enum.KeyCode.S then keys.S = false end
+	if input.KeyCode == Enum.KeyCode.D then keys.D = false end
+	if input.KeyCode == Enum.KeyCode.Q then keys.Q = false end
+	if input.KeyCode == Enum.KeyCode.E then keys.E = false end
+end)
+
+local mouseLook = false
+local lastMouse
+
+UIS.InputBegan:Connect(function(input, gp)
+	if gp then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		mouseLook = true
+		lastMouse = UIS:GetMouseLocation()
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		mouseLook = false
+	end
+end)
+
+local function sortKeys()
+	table.sort(keyframes, function(a, b)
+		return a.Time < b.Time
+	end)
+end
+
+local function getMaxTime()
+	local maxTime = 1
+	for _, k in ipairs(keyframes) do
+		maxTime = math.max(maxTime, k.Time)
+	end
+	return maxTime
+end
+
+refresh = function()
+	for _, v in ipairs(keysFrame:GetChildren()) do
+		if v ~= scrubber then
+			v:Destroy()
+		end
+	end
+
+	local maxTime = getMaxTime()
+local keySize = 12
+
+	for i, k in ipairs(keyframes) do
+		local dot = Instance.new("TextButton")
+
+		dot.Size = UDim2.fromOffset(keySize, keySize)
+		dot.AnchorPoint = Vector2.new(0.5, 0.5)
+
+		dot.Position = UDim2.new(
+			math.clamp(k.Time / maxTime, 0, 1),
+			0,
+			0.5,
+			0
+		)
+
+		dot.BackgroundColor3 =
+			(i == selectedKey)
+			and Color3.fromRGB(255, 190, 60)
+			or Color3.new(1, 1, 1)
+
+		dot.Text = ""
+		dot.BorderSizePixel = 0
+		dot.ZIndex = 5
+		dot.Parent = keysFrame
+
+		Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+
+		dot.MouseButton1Click:Connect(function()
+			selectedKey = i
+			
+			updateEffectsButton()
+			currentTime = k.Time
+			timeBox.Text = string.format("%.2f", currentTime)
+
+			local tweenName = k.Tween or "Linear"
+			local directionName = k.Direction or "InOut"
+
+			pendingTweenType = tweenName
+			pendingTweenDirection = directionName
+
+			tweenButton.Text =
+				"Tween: " .. tweenName .. " " .. directionName
+
+			camera.CFrame = k.CFrame
+			camPos = k.CFrame.Position
+
+			local x, y = k.CFrame:ToOrientation()
+			pitch, yaw = x, y
+
+			refresh()
+		end)
+	end
+
+	local alpha = math.clamp(currentTime / maxTime, 0, 1)
+
+	scrubber.Position = UDim2.new(
+		alpha,
+		0,
+		0.5,
+		0
+	)
+
+	timeLabel.Text =
+		string.format(
+			"Time: %.2f | Keys: %d",
+			currentTime,
+			#keyframes
+		)
+end
+
+-- Logic kéo thả vạch trắng (Scrubber)
+local scrubbing = false
+
+timeline.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		scrubbing = true
+		local maxTime = getMaxTime()
+		local absPos = keysFrame.AbsolutePosition.X
+		local absSize = keysFrame.AbsoluteSize.X
+		if absSize > 0 then
+			local relativeX = math.clamp((input.Position.X - absPos) / absSize, 0, 1)
+			currentTime = relativeX * maxTime
+			timeBox.Text = string.format("%.2f", currentTime)
+			refresh()
+		end
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if scrubbing and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local maxTime = getMaxTime()
+		local absPos = keysFrame.AbsolutePosition.X
+		local absSize = keysFrame.AbsoluteSize.X
+		if absSize > 0 then
+			local relativeX = math.clamp((input.Position.X - absPos) / absSize, 0, 1)
+			currentTime = relativeX * maxTime
+			timeBox.Text = string.format("%.2f", currentTime)
+			refresh()
+		end
+	end
+end)
+
+UIS.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		scrubbing = false
+	end
+end)
+
+create.MouseButton1Click:Connect(function()
+	local t = tonumber(timeBox.Text) or currentTime
+	t = math.max(0, t)
+	
+	if #keyframes >= maxKeyframesPerLayer then
+	local updating = false
+
+	for _, k in ipairs(keyframes) do
+		if math.abs(k.Time - t) < 0.001 then
+			updating = true
+			break
+		end
+	end
+
+	if not updating then
+		notify("This layer already has 10 keyframes.")
+		return
+	end
+end
+
+	for _, k in ipairs(keyframes) do
+		if math.abs(k.Time - t) < 0.001 then
+			k.CFrame = camera.CFrame
+			k.Tween = pendingTweenType
+			k.Direction = pendingTweenDirection
+			refresh()
+			status.Text = "Keyframe updated"
+			return
+		end
+	end
+
+	table.insert(keyframes, {
+		Time = t,
+		CFrame = camera.CFrame,
+		Tween = pendingTweenType,
+		Direction = pendingTweenDirection
+	})
+
+	sortKeys()
+	selectedKey = nil
+	currentTime = t
+	timeBox.Text = string.format("%.2f", currentTime)
+
+	refresh()
+	status.Text = "Keyframe created"
+end)
+
+delete.MouseButton1Click:Connect(function()
+	if #keyframes == 0 then
+		notify("There are no keyframes to delete.")
+		return
+	end
+
+	deleteFrame.Visible = true
+	overlay.Visible = true
+end)
+
+selectedDeleteButton.MouseButton1Click:Connect(function()
+	deleteFrame.Visible = false
+
+	if not selectedKey or not keyframes[selectedKey] then
+		overlay.Visible = false
+		notify("Please select a keyframe first.")
+		return
+	end
+
+	deleteMode = "selected"
+
+	confirmText.Text = "Are you sure you want to delete the selected keyframe?"
+	confirmFrame.Visible = true
+end)
+
+allDeleteButton.MouseButton1Click:Connect(function()
+	deleteFrame.Visible = false
+
+	deleteMode = "all"
+
+	confirmText.Text = "Are you sure you want to delete ALL keyframes?"
+	confirmFrame.Visible = true
+end)
+
+deleteCancelButton.MouseButton1Click:Connect(function()
+	deleteFrame.Visible = false
+	overlay.Visible = false
+	deleteMode = nil
+end)
+
+timeBox.FocusLost:Connect(function()
+	local t = tonumber(timeBox.Text)
+	if t then
+		currentTime = math.max(0, t)
+		timeBox.Text = string.format("%.2f", currentTime)
+		refresh()
+	end
+end)
+
+freecamButton.MouseButton1Click:Connect(function()
+	freecam = not freecam
+	updateFreecamState(freecam)
+	
+	updateOptionButtons()
+
+	if freecam then
+		camPos = camera.CFrame.Position
+		local x, y = camera.CFrame:ToOrientation()
+		pitch, yaw = x, y
+
+		freecamButton.Text = "Freecam: ON"
+		status.Text = mobile and "Mobile freecam active" or "Freecam active"
+	else
+		freecamButton.Text = "Freecam: OFF"
+		status.Text = "Freecam disabled"
+	end
+
+	joystick.Visible = freecam and mobile
+end)
+
+local function getSpeed()
+	return tonumber(speedBox.Text:match("[%d%.]+")) or 1
+end
+
+speedBox.FocusLost:Connect(function()
+	local speedNum = tonumber(speedBox.Text:match("[%d%.]+")) or 1
+	speedBox.Text = "Speed " .. tostring(speedNum)
+end)
+
+
+local activeTween = nil
+
+local function ease(alpha, style, direction)
+	if style == "Cut" then
+		return 1
+	end
+
+	local easingStyle = Enum.EasingStyle[style] or Enum.EasingStyle.Linear
+	local easingDirection = Enum.EasingDirection[direction] or Enum.EasingDirection.InOut
+
+	return TweenService:GetValue(
+		alpha,
+		easingStyle,
+		easingDirection
+	)
+end
+
+local function finishAnimation()
+	playing = false
+	activeTween = nil
+
+	currentLayer = math.max(1, math.min(playStartLayer, getLastLayer()))
+	keyframes = layers[currentLayer]
+
+	selectedKey = nil
+
+	restoreAllGui()
+
+	updateFreecamState(freecam)
+
+	if freecam then
+		camera.CameraType = Enum.CameraType.Scriptable
+		joystick.Visible = mobile
+	else
+		camera.CameraType = Enum.CameraType.Custom
+		joystick.Visible = false
+	end
+
+	currentTime = currentTime or 0
+	timeBox.Text = string.format("%.2f", currentTime)
+
+	refresh()
+	updateLayerUI()
+
+	status.Text = "Animation finished"
+end
+
+local function runKeyframeEffect(key)
+	if not key or not key.Effect or key.Effect == "" then
+		return
+	end
+
+	local fn = key.CompiledEffect
+
+	if not fn then
+		local success, result = pcall(loadstring, key.Effect)
+
+		if not success or type(result) ~= "function" then
+			return
+		end
+
+		fn = result
+		key.CompiledEffect = fn
+	end
+
+	task.spawn(function()
+		pcall(fn)
+	end)
+end
+
+local function playAnimation()
+	if #keyframes < 2 or playing then
+		return
+	end
+
+	sortKeys()
+
+	playing = true
+	activeTween = nil
+
+	playStartLayer = currentLayer
+
+	currentLayer = 1
+	keyframes = layers[1]
+	selectedKey = nil
+	currentTime = 0
+
+	hideAllGui()
+
+	camera.CameraType = Enum.CameraType.Scriptable
+
+	local firstKey = layers[1][1]
+
+	if not firstKey then
+		finishAnimation()
+		return
+	end
+
+	camera.CFrame = firstKey.CFrame
+	camPos = firstKey.CFrame.Position
+
+	local fx, fy = firstKey.CFrame:ToOrientation()
+	pitch, yaw = fx, fy
+
+	task.spawn(function()
+		runKeyframeEffect(firstKey)
+	end)
+
+	currentTime = firstKey.Time
+
+	for layerIndex = 1, getLastLayer() do
+		if not playing then
+			break
+		end
+
+		currentLayer = layerIndex
+		keyframes = layers[layerIndex]
+		selectedKey = nil
+
+		local layer = layers[layerIndex]
+
+		if #layer == 0 then
+			continue
+		end
+
+		table.sort(layer, function(a, b)
+			return a.Time < b.Time
+		end)
+
+		for i = 1, #layer - 1 do
+			if not playing then
+				break
+			end
+
+			local a = layer[i]
+			local b = layer[i + 1]
+
+			local rawDuration = math.max(
+				b.Time - a.Time,
+				0
+			)
+
+			local speed = math.max(getSpeed(), 0.01)
+			local duration = rawDuration / speed
+
+			if duration <= 0 then
+				currentTime = b.Time
+
+				if a.Tween == "Cut" then
+					camera.CFrame = b.CFrame
+				else
+					camera.CFrame = b.CFrame
+				end
+
+				camPos = b.CFrame.Position
+
+				local x, y = b.CFrame:ToOrientation()
+				pitch, yaw = x, y
+
+				task.spawn(function()
+					runKeyframeEffect(b)
+				end)
+
+				continue
+			end
+
+			local startCFrame = a.CFrame
+			local startTime = os.clock()
+
+			while playing do
+				local elapsed = os.clock() - startTime
+				local alpha = math.clamp(
+					elapsed / duration,
+					0,
+					1
+				)
+
+				-- Timeline luôn chạy từ A -> B,
+				-- kể cả khi transition là Cut.
+				currentTime =
+					a.Time +
+					(b.Time - a.Time) * alpha
+
+				-- CUT:
+				-- Camera giữ nguyên tại A trong toàn bộ duration.
+				-- Chỉ snap sang B khi alpha đạt 1.
+				if a.Tween == "Cut" then
+					camera.CFrame = startCFrame
+
+				-- NORMAL TWEEN
+				else
+					local easedAlpha = ease(
+						alpha,
+						a.Tween or "Linear",
+						a.Direction or "InOut"
+					)
+
+					camera.CFrame =
+						startCFrame:Lerp(
+							b.CFrame,
+							easedAlpha
+						)
+				end
+
+				if alpha >= 1 then
+					break
+				end
+
+				RunService.RenderStepped:Wait()
+			end
+
+			if not playing then
+				break
+			end
+
+			-- Đã tới đúng thời điểm của keyframe B.
+			currentTime = b.Time
+
+			-- Cut chỉ snap camera tại thời điểm này.
+			camera.CFrame = b.CFrame
+
+			camPos = b.CFrame.Position
+
+			local x, y = b.CFrame:ToOrientation()
+			pitch, yaw = x, y
+
+			task.spawn(function()
+				runKeyframeEffect(b)
+			end)
+		end
+	end
+
+	if not playing then
+		return
+	end
+
+	local lastLayerIndex = getLastLayer()
+	local lastLayer = layers[lastLayerIndex]
+
+	if lastLayer and #lastLayer > 0 then
+		table.sort(lastLayer, function(a, b)
+			return a.Time < b.Time
+		end)
+
+		local lastKey = lastLayer[#lastLayer]
+
+		camera.CFrame = lastKey.CFrame
+		currentTime = lastKey.Time
+
+		camPos = lastKey.CFrame.Position
+
+		local x, y = lastKey.CFrame:ToOrientation()
+		pitch, yaw = x, y
+	end
+
+	finishAnimation()
+end
+
+play.MouseButton1Click:Connect(function()
+	if playing then return end
+	task.spawn(playAnimation)
+end)
+
+stop.MouseButton1Click:Connect(function()
+	if activeTween then
+		activeTween:Cancel()
+		activeTween = nil
+	end
+
+	playing = false
+
+	restoreAllGui()
+
+	currentLayer = math.max(1, math.min(playStartLayer, getLastLayer()))
+	keyframes = layers[currentLayer]
+
+	if #keyframes > 0 then
+		camera.CFrame = keyframes[1].CFrame
+		camPos = keyframes[1].CFrame.Position
+
+		local x, y = keyframes[1].CFrame:ToOrientation()
+		pitch, yaw = x, y
+
+		currentTime = keyframes[1].Time
+	else
+		currentTime = 0
+	end
+
+	timeBox.Text = string.format("%.2f", currentTime)
+	refresh()
+	updateLayerUI()
+
+	status.Text = "Animation stopped"
+
+	updateFreecamState(freecam)
+	joystick.Visible = freecam and mobile
+end)
+
+local function serialize(cf)
+	local t = {cf:GetComponents()}
+	local s = ""
+	for i, v in ipairs(t) do
+		s = s .. string.format("%.10f", v)
+		if i < #t then s = s .. "," end
+	end
+	return s
+end
+
+local function sanitizeName(name)
+	name = name:gsub("[\\/:*?\"<>|]", "_")
+	name = name:gsub("^%s+", ""):gsub("%s+$", "")
+	return name
+end
+
+local function createAnimationData(name)
+	local out = "return {\n"
+	out = out .. "\tName = " .. string.format("%q", name) .. ",\n"
+	out = out .. "\tSpeed = " .. string.format("%.10f", getSpeed()) .. ",\n"
+	out = out .. "\tKeyframes = {\n"
+
+	for _, k in ipairs(keyframes) do
+		out = out .. "\t\t{\n"
+		out = out .. "\t\t\tTime = " .. string.format("%.10f", k.Time) .. ",\n"
+		out = out .. "\t\t\tCFrame = CFrame.new(" .. serialize(k.CFrame) .. "),\n"
+		out = out .. "\t\t\tTween = " .. string.format("%q", k.Tween or "Linear") .. ",\n"
+		out = out .. "\t\t\tDirection = " .. string.format("%q", k.Direction or "InOut") .. ",\n"
+		out = out .. "\t\t\tEffect = " .. string.format("%q", k.Effect or "") .. ",\n"
+		out = out .. "\t\t},\n"
+	end
+
+	out = out .. "\t}\n"
+	out = out .. "}"
+
+	return out
+end
+
+export.MouseButton1Click:Connect(function()
+	if #keyframes == 0 then
+		notify("There are no keyframes to save.")
+		return
+	end
+
+	overlay.Visible = true
+	saveFrame.Visible = true
+	importFrame.Visible = false
+	confirmFrame.Visible = false
+
+	nameBox.Text = ""
+	nameBox:CaptureFocus()
+end)
+
+saveButton.MouseButton1Click:Connect(function()
+	local name = sanitizeName(nameBox.Text)
+
+	if name == "" then
+		return
+	end
+
+	if not writefile then
+		notify("Executor does not support writefile.")
+		return
+	end
+
+	local fileName = "CameraAnimation_" .. name .. ".lua"
+	local data = createAnimationData(name)
+
+	local success = pcall(function()
+		writefile(fileName, data)
+	end)
+
+	if success then
+		overlay.Visible = false
+		saveFrame.Visible = false
+		notify("Succesfully saved your animation: " .. name)
+	else
+		notify("Failed to save animation.")
+	end
+end)
+
+local function getAnimationFiles()
+	local files = {}
+
+	if not listfiles then
+		return files
+	end
+
+	local success, result = pcall(function()
+		return listfiles("")
+	end)
+
+	if not success or type(result) ~= "table" then
+		success, result = pcall(listfiles)
+	end
+
+	if not success or type(result) ~= "table" then
+		return files
+	end
+
+	for _, file in ipairs(result) do
+		file = tostring(file)
+
+		local fileName = file:match("([^\\/]+)$")
+
+		if fileName then
+			local name = fileName:match("^CameraAnimation_(.+)%.lua$")
+
+			if name then
+				local valid = true
+
+				if isfile then
+					local ok, result = pcall(isfile, file)
+					valid = ok and result == true
+				end
+
+				if valid then
+					table.insert(files, {
+						File = file,
+						Name = name
+					})
+				end
+			end
+		end
+	end
+
+	table.sort(files, function(a, b)
+		return a.Name:lower() < b.Name:lower()
+	end)
+
+	return files
+end
+
+local function clearAnimationList()
+	for _, child in ipairs(animationList:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+end
+
+local function refreshAnimationList()
+	clearAnimationList()
+
+	local files = getAnimationFiles()
+
+	for _, fileData in ipairs(files) do
+		local row = Instance.new("Frame")
+
+		row.Size = UDim2.new(1, -10, 0, 40)
+		row.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+		row.BorderSizePixel = 0
+		row.ZIndex = 202
+		row.Parent = animationList
+
+		Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+		local fileButton = Instance.new("TextButton")
+
+		fileButton.Position = UDim2.fromOffset(10, 0)
+		fileButton.Size = UDim2.new(1, -85, 1, 0)
+		fileButton.BackgroundTransparency = 1
+		fileButton.Text = fileData.Name
+		fileButton.TextColor3 = Color3.new(1, 1, 1)
+		fileButton.Font = Enum.Font.GothamMedium
+		fileButton.TextSize = 12
+		fileButton.TextXAlignment = Enum.TextXAlignment.Left
+		fileButton.BorderSizePixel = 0
+		fileButton.ZIndex = 203
+		fileButton.Parent = row
+
+		local deleteButton = Instance.new("TextButton")
+
+		deleteButton.Position = UDim2.new(1, -70, 0, 5)
+		deleteButton.Size = UDim2.fromOffset(60, 30)
+		deleteButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+		deleteButton.Text = "Delete"
+		deleteButton.TextColor3 = Color3.new(1, 1, 1)
+		deleteButton.Font = Enum.Font.GothamBold
+		deleteButton.TextSize = 11
+		deleteButton.BorderSizePixel = 0
+		deleteButton.ZIndex = 203
+		deleteButton.Parent = row
+
+		Instance.new("UICorner", deleteButton).CornerRadius = UDim.new(0, 6)
+
+		fileButton.MouseButton1Click:Connect(function()
+			selectedAnimationFile = fileData
+			selectedDeleteFile = nil
+			confirmAction = "import"
+
+			confirmText.Text =
+				'Do you want to load this animation file "' ..
+				fileData.Name ..
+				'"?'
+
+			confirmFrame.Visible = true
+		end)
+
+		deleteButton.MouseButton1Click:Connect(function()
+			selectedDeleteFile = fileData
+			selectedAnimationFile = nil
+			confirmAction = "delete"
+
+			confirmText.Text =
+				'Do you want to delete this animation file "' ..
+				fileData.Name ..
+				'"?'
+
+			confirmFrame.Visible = true
+		end)
+	end
+end
+
+import.MouseButton1Click:Connect(function()
+	if not listfiles then
+		notify("Executor does not support listfiles.")
+		return
+	end
+
+	overlay.Visible = true
+	saveFrame.Visible = false
+	confirmFrame.Visible = false
+	importFrame.Visible = true
+
+	refreshAnimationList()
+end)
+
+noButton.MouseButton1Click:Connect(function()
+	confirmFrame.Visible = false
+	selectedAnimationFile = nil
+	selectedDeleteFile = nil
+	confirmAction = nil
+end)
+
+yesButton.MouseButton1Click:Connect(function()
+	if deleteMode == "selected" then
+	if selectedKey and keyframes[selectedKey] then
+		table.remove(keyframes, selectedKey)
+		selectedKey = nil
+	end
+
+	effectFrame.Visible = false
+	updateEffectsButton()
+
+		deleteMode = nil
+		confirmFrame.Visible = false
+		overlay.Visible = false
+
+		currentTime = math.max(0, currentTime)
+		timeBox.Text = string.format("%.2f", currentTime)
+
+		refresh()
+		status.Text = "Selected keyframe deleted"
+
+		return
+	end
+
+	if deleteMode == "all" then
+		table.clear(keyframes)
+
+		selectedKey = nil
+		currentTime = 0
+		timeBox.Text = "0"
+		
+		effectFrame.Visible = false
+updateEffectsButton()
+
+		deleteMode = nil
+		confirmFrame.Visible = false
+		overlay.Visible = false
+
+		refresh()
+		status.Text = "All keyframes deleted"
+
+		return
+	end
+
+	-- phần code confirmAction cũ ở dưới
+	if confirmAction == "delete" then
+		if not selectedDeleteFile then
+			confirmFrame.Visible = false
+			return
+		end
+
+		local fileData = selectedDeleteFile
+		local fileName = fileData.Name
+
+		local success = pcall(function()
+			if isfile and isfile(fileData.File) then
+				delfile(fileData.File)
+			end
+		end)
+
+		confirmFrame.Visible = false
+		selectedDeleteFile = nil
+		confirmAction = nil
+
+		if success then
+			refreshAnimationList()
+			notify('Succesfully deleted animation file "' .. fileName .. '"')
+		else
+			notify("Failed to delete animation file.")
+		end
+
+		return
+	end
+
+	if confirmAction == "import" then
+		if not selectedAnimationFile then
+			confirmFrame.Visible = false
+			return
+		end
+
+		local fileData = selectedAnimationFile
+
+		local success, fileContent = pcall(function()
+			return readfile(fileData.File)
+		end)
+
+		if not success or not fileContent then
+			notify("Failed to read animation file.")
+			confirmFrame.Visible = false
+			selectedAnimationFile = nil
+			confirmAction = nil
+			return
+		end
+
+		local fn, err = loadstring(fileContent)
+
+		if not fn then
+			notify("Invalid animation file.")
+			confirmFrame.Visible = false
+			selectedAnimationFile = nil
+			confirmAction = nil
+			return
+		end
+
+		local ok, data = pcall(fn)
+
+		if not ok or type(data) ~= "table" then
+			notify("Invalid animation data.")
+			confirmFrame.Visible = false
+			selectedAnimationFile = nil
+			confirmAction = nil
+			return
+		end
+
+		table.clear(keyframes)
+
+		for _, k in ipairs(data.Keyframes or {}) do
+			if typeof(k.CFrame) == "CFrame" and tonumber(k.Time) then
+				table.insert(keyframes, {
+	Time = tonumber(k.Time),
+	CFrame = k.CFrame,
+	Tween = k.Tween or "Linear",
+	Direction = k.Direction or "InOut",
+	Effect = k.Effect or ""
+})
+			end
+		end
+
+		sortKeys()
+
+		if tonumber(data.Speed) then
+			speedBox.Text = "Speed " .. tostring(data.Speed)
+		end
+
+		currentTime = 0
+		selectedKey = nil
+		pendingTweenType = "Linear"
+		pendingTweenDirection = "InOut"
+
+		timeBox.Text = "0"
+
+		refresh()
+
+		confirmFrame.Visible = false
+		importFrame.Visible = false
+		overlay.Visible = false
+
+		notify("Succesfully loaded animation file: " .. fileData.Name)
+
+		selectedAnimationFile = nil
+		confirmAction = nil
+	end
+end)
+
+-- Kéo thả Main UI mượt mà
+local dragging = false
+local dragInput, dragStart, startPos
+
+title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+title.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UIS.InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		main.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+
+RunService.RenderStepped:Connect(function(dt)
+	if not freecam or playing then return end
+
+	if mouseLook then
+		local mouse = UIS:GetMouseLocation()
+		local d = mouse - lastMouse
+		lastMouse = mouse
+
+		yaw -= d.X * 0.003
+		pitch = math.clamp(pitch - d.Y * 0.003, -1.5, 1.5)
+	end
+
+	local rotation = CFrame.fromOrientation(pitch, yaw, 0)
+	local move = Vector3.zero
+
+	if keys.W then move += Vector3.new(0, 0, -1) end
+	if keys.S then move += Vector3.new(0, 0, 1) end
+	if keys.A then move += Vector3.new(-1, 0, 0) end
+	if keys.D then move += Vector3.new(1, 0, 0) end
+	if keys.Q then move += Vector3.new(0, -1, 0) end
+	if keys.E then move += Vector3.new(0, 1, 0) end
+
+	if mobileMove.Magnitude > 0.01 then
+		move += Vector3.new(mobileMove.X, 0, mobileMove.Y)
+	end
+
+	if move.Magnitude > 1 then
+		move = move.Unit
+	end
+
+	if move.Magnitude > 0 then
+		local speed = 30
+		camPos += rotation:VectorToWorldSpace(move) * speed * dt
+	end
+
+	camera.CFrame = CFrame.new(camPos) * rotation
+end)
+
+refresh()
+updateLayerUI()
+updateOptionButtons()
