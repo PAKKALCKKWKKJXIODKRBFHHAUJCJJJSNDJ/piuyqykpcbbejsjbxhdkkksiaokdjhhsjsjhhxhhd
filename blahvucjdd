@@ -1,0 +1,533 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Test/main/Doors/Functions.lua"))()
+local Achievements = loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Test/refs/heads/main/Doors/Achievements.lua"))()
+
+local reb = false
+local seer = false
+local mat = false
+local phil = false
+local blink = false
+local clam = false
+
+Caption('You Executed the Script', 2)
+wait(2)
+Caption('Credits to zavaled for Making Endless Doors',1)
+wait(2)
+Caption('Credits to Cyrratti for making the original script.',3)
+wait(3)
+Caption('Credits to Voopr0 for fixing Endless Mode',3)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/Endless-Doors-In-Doors/main/custom%20doors%20sounds.txt"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Doors-Mode-Remakes/refs/heads/main/Victrola.lua"))()
+-- Seek Model
+workspace.ChildAdded:Connect(function(seek)
+	if seek.Name == "SeekMoving" then
+		wait(0.5)
+	    workspace.SeekMoving.SeekRig.Head.Eye.Decal.Texture = "rbxassetid://0"
+		for i,v in pairs(workspace.SeekMoving.SeekRig:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.Transparency = 1
+			end
+		end
+		local getSeek Model = game:GetObjects("rbxassetid://11854226054")[1]
+		getSeek.Parent = workspace.SeekMoving.Figure
+		getSeek:PivotTo(workspace.SeekMoving.Figure.CFrame)
+		local Weld = Instance.new("WeldConstraint",getSeek)
+		Weld.Part0 = getSeek.PrimaryPart
+		Weld.Part1 = workspace.SeekMoving.Figure
+	else
+
+	end
+end)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/worldcuuuup/refs/heads/main/FUCKOFFBLINK.txt"))()
+
+coroutine.wrap(function()
+    while true do
+        wait()
+        workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Door.Door.Unlock.SoundId = "rbxassetid://7758131110"
+        workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Door.Door.SlamOpen.SoundId = "rbxassetid://9113647192"
+        workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Door.Door.SlamOpen.TimePosition = 0.2
+    end
+end)()
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+
+-- Guid Light By DripyCapybara
+local GuideLight = Instance.new("ScreenGui")
+GuideLight.Name = "Noor"
+GuideLight.Parent = game.Players.LocalPlayer.PlayerGui
+local a = game.Players.LocalPlayer.PlayerGui.MainUI
+local b = a.Death:Clone()
+b.Name = "AltGuide"
+b.Parent = GuideLight
+b.Static.TileSize = UDim2.new(0, 900, 0, 100)
+b.HelpfulDialogue.TextColor3 = Color3.fromRGB(255, 255, 255)  
+b.Static.BackgroundColor3 = Color3.fromRGB(173, 102, 81)
+b.Static.Image = "rbxassetid://0"
+b.Static.BackgroundTransparency = 1
+b.Static.Static.ImageTransparency = 1
+b.HelpfulDialogue.UIScale.Scale = 0.7
+b.Visible = true
+b.Static.Visible = true
+b.HelpfulDialogue.TextTransparency = 1
+b.HelpfulDialogue.Visible = true
+b.HelpfulDialogue.Text = "oh my goodness gracious"
+b.HelpfulDialogue.Font = "SourceSansBold"
+b.Static.Static.Image = "rbxassetid://4388380012"
+b.Static.Static.ImageColor3 = Color3.fromRGB(59, 222, 255)
+b.ImageColor3 = Color3.fromRGB(0, 0, 0)
+local Pink = Instance.new("Sound")
+Pink.Parent = b
+Pink.Name = "Pink"
+Pink.SoundId = "rbxassetid://4835664238"
+Pink.Volume = 0
+Pink.Pitch = 1
+Pink.TimePosition = 0.2
+local roast = Instance.new("Sound")
+roast.Parent = b
+roast.Name = "Over"
+roast.SoundId = "rbxassetid://4835664238"
+roast.Volume = 3
+roast.Pitch = 1
+roast.TimePosition = 0.2
+
+-- Rebound
+coroutine.wrap(function()
+    task.wait()
+   local jobIdd = game.JobId
+    local numm = jobIdd:gsub("%D+", "")
+   local seedd = tonumber(numm:sub(1, 9)) or os.time()
+    local rngg = Random.new(seedd + 20)
+   local vu62 = {
+       rngg:NextInteger(1, 25),
+rngg:NextInteger(26, 40),
+rngg:NextInteger(41, 60),
+rngg:NextInteger(61, 80),
+rngg:NextInteger(81, 101)
+}
+    game.ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
+        if table.find(vu62, game.ReplicatedStorage.GameData.LatestRoom.Value) then
+   if workspace:FindFirstChild("SeekMovingNewClone") then
+          return
+   end
+loadstring(game:HttpGet("https://pastefy.app/QG3uxTXD/raw"))()
+end
+end)
+end)()
+
+-- Phil
+coroutine.wrap(function()
+    task.wait()
+   local jobId = game.JobId
+    local num = jobId:gsub("%D+", "")
+   local seed = tonumber(num:sub(1, 9)) or os.time()
+    local rng = Random.new(seed)
+   local vu61 = {
+        rng:NextInteger(1, 50),
+        rng:NextInteger(51, 101)
+}
+    game.ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
+        if table.find(vu61, game.ReplicatedStorage.GameData.LatestRoom.Value) then
+local currentLoadedRoom=workspace.CurrentRooms[game:GetService("ReplicatedStorage").GameData.LatestRoom.Value]
+
+local num=0
+if currentLoadedRoom:FindFirstChild("Nodes") then
+   num = math.floor(#currentLoadedRoom.Nodes:GetChildren()/2)
+end
+wait(0.5)
+ModuleEvents = require(game:GetService("ReplicatedStorage").ModulesClient.Module_Events)
+ModuleEvents.shatter(workspace.CurrentRooms[game:GetService("ReplicatedStorage").GameData.LatestRoom.Value])
+		local CameraShaker = require(game.ReplicatedStorage.CameraShaker)
+		local camara = game.Workspace.CurrentCamera
+		local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+			camara.CFrame = camara.CFrame * shakeCf
+		end)
+		local camara = game.Workspace.CurrentCamera
+		local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+			camara.CFrame = camara.CFrame * shakeCf
+		end)
+		camShake:Start()
+		camShake:ShakeOnce(100,50,0.5,0.5)
+        local roast = Instance.new("Sound")
+    roast.Parent = workspace
+    roast.Name = "Break2"
+    roast.SoundId = "rbxassetid://6737582037"
+    roast.Volume = 1
+    local roast1 = Instance.new("Sound")
+    roast1.Parent = workspace
+    roast1.Name = "Break1"
+    roast1.SoundId = "rbxassetid://9103909576"
+    roast1.Volume = 1
+    local roast2 = Instance.new("Sound")
+    roast2.Parent = workspace
+    roast2.Name = "Break2"
+    roast2.SoundId = "rbxassetid://5961220911"
+    roast2.Volume = 1
+    roast2:Play()
+    roast1:Play()
+    roast:Play()
+	local tweeninfo = TweenInfo.new(0.5)
+	local info = {Color = Color3.new(0, 0, 0)}
+	for i,v in pairs(workspace.CurrentRooms[game:GetService("ReplicatedStorage").GameData.LatestRoom.Value]:GetDescendants()) do
+		if v:IsA("Light") then
+			game.TweenService:Create(v,tweeninfo,info):Play()
+			if v.Parent.Name == "LightFixture" then
+				game.TweenService:Create(v.Parent,tweeninfo,info):Play()
+			end
+		end
+	end
+if workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Assets:FindFirstChild("Rug") then
+workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Assets.Rug:Destroy()
+end
+room = game:GetService("ReplicatedStorage").GameData.LatestRoom.Value
+for i, v in pairs(workspace.CurrentRooms[room].Parts:GetChildren()) do 
+	if v.Name == "Wall" then
+		v.Material = "Limestone"
+		v.Color = Color3.new(0, 0, 0)
+			if v:FindFirstChild("Wallpaper") ~= nil then
+			v.Wallpaper:Destroy()
+			end
+	end
+end
+for i, v in pairs(workspace.CurrentRooms[room].Parts.DropCeiling:GetChildren()) do 
+	if v.Name == "Ceiling" then
+		v.Material = "Limestone"
+		v.Color = Color3.new(0, 0, 0)
+	end
+end
+for i, v in pairs(workspace.CurrentRooms[room]:GetChildren()) do 
+	if v.Name == "Door" and v:IsA("Model") then
+		v.Door.Color = Color3.fromRGB(51, 0, 0)
+	end
+end
+for i, v in pairs(workspace.CurrentRooms[room].Parts.DropCeiling.Model:GetChildren()) do 
+	v.Material = "Limestone"
+	v.Color = Color3.new(0, 0, 0)
+end
+    for i,v in pairs(workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Parts:GetDescendants()) do
+  if v:IsA("BasePart") and game.ReplicatedStorage.GameData.LatestRoom.Value < 90 then
+        v.Material = Enum.Material.Limestone
+        v.Color = Color3.new(0, 0, 0) -- sets the color
+        end
+    end
+end
+end)
+end)()
+
+-- Blink
+coroutine.wrap(function()
+    while true do
+        wait(300)
+        game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+          if workspace:FindFirstChild("SeekMovingNewClone") or workspace.CurrentRooms:FindFirstChild("50") then
+          return
+    end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Test/main/Doors/Functions.lua"))()
+local num=0
+local currentLoadedRoom = workspace.CurrentRooms[game:GetService("ReplicatedStorage").GameData.LatestRoom.Value]
+if currentLoadedRoom:FindFirstChild("Nodes") then
+   num = math.floor(#currentLoadedRoom.Nodes:GetChildren()/2)
+end
+
+local eyes=game:GetObjects("rbxassetid://12621816107")[1]
+eyes.CFrame=(
+	num==0 and currentLoadedRoom[currentLoadedRoom.Name] or currentLoadedRoom.Nodes[num]
+).CFrame + Vector3.new(0, 3, 0)
+
+eyes.Parent=workspace
+eyes.Initiate:Play()
+local Blink = Instance.new("Sound")
+Blink.Parent = eyes
+Blink.SoundId = "rbxassetid://9120572970"
+Blink.Volume = 7
+local Blink2 = Instance.new("Sound")
+Blink2.Parent = eyes
+Blink2.SoundId = "rbxassetid://9119294536"
+Blink2.Volume = 7
+Blink:Play()
+Blink2:Play()
+eyes.Change:Play()
+    local death1 = Instance.new("Sound")
+    death1.Parent = eyes
+    death1.Name = "BlinkDie"
+    death1.SoundId = "rbxassetid://5867708670"
+    death1.Volume = 0.7
+    death1.Pitch = 2
+    local distort = Instance.new("DistortionSoundEffect")
+    distort.Level = 0.9
+    distort.Parent = death1
+    local eq = Instance.new("EqualizerSoundEffect")
+    eq.HighGain = -60
+    eq.MidGain = 0
+    eq.LowGain = 0
+    eq.Parent = death1
+eyes.Attachment.Close.Enabled = false
+eyes.Attachment.Open.Enabled = true
+
+local dmg = true 
+local plr = game.Players.LocalPlayer
+local chr = plr.Character
+
+task.spawn(function()
+            game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+            eyes:Destroy()
+            dmg = false
+wait(2)
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/Voor-Pr00/Achivements/refs/heads/main/Voorpr0"))()
+
+---====== Display achievement ======---
+achievementGiver({
+    Title = "Red Light, Green light.",
+    Desc = "Encounter Blink.",
+    Reason = "",
+    Image = GetGitImage("https://github.com/check78/entity-images/blob/main/omg.png?raw=true","mmmtasty")
+})
+end)
+
+local function SwitchEye()
+            if game.Workspace.Blink.Attachment.Close.Enabled == true then
+                eyes.Attachment.Close.Enabled = false
+                eyes.Attachment.Open.Enabled = true
+Blink2:Play()
+               Blink:Play()
+            elseif game.Workspace.Blink.Attachment.Close.Enabled == false then
+                eyes.Attachment.Close.Enabled = true
+                eyes.Attachment.Open.Enabled = false
+Blink2:Play()
+                Blink:Play()
+            end 
+end
+
+task.spawn(function()
+            while true do
+                wait(8.5)
+                SwitchEye()
+            end
+end)
+
+wait(1.3)
+task.spawn(function()
+            while true do
+            wait(0.3)
+                if game.Workspace.Blink.Attachment.Open.Enabled == true then
+                    if chr.Humanoid.MoveDirection ~= Vector3.new(0, 0, 0) and dmg == true then 
+		game.Players.LocalPlayer.Character.Humanoid:TakeDamage(1000)
+	    death1:Play()
+	game:GetService("ReplicatedStorage").GameStats["Player_".. game.Players.LocalPlayer.Name].Total.DeathCause.Value = "Blink"
+	dmg = false
+	wait(1.8)
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/GuidingLight/main/BlinkDie.txt"))()
+                            break
+                    end -- Move
+                end -- if no closed
+            end -- while true do
+end)
+if blink == false then
+            wait(5)
+            blink = true
+end
+end
+end)()
+
+-- Overseer Eyes
+coroutine.wrap(function()
+    while true do
+        wait(140)
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+  if workspace:FindFirstChild("SeekMovingNewClone") or workspace.CurrentRooms:FindFirstChild("50") then
+          return
+    end
+wait(0.5)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Doors-Mode-Remakes/refs/heads/main/Overseer.lua"))()
+if seer == false then
+wait(3)
+seer = true
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/Voor-Pr00/Achivements/refs/heads/main/Voorpr0"))()
+
+---====== Display achievement ======---
+achievementGiver({
+    Title = "Staring Back.",
+    Desc = "Encounter Overseer Eyes.",
+    Reason = "",
+    Image = GetGitImage("https://github.com/check78/worldcuuuup/blob/main/OverseerBadge.png?raw=true","seerbadge")
+})
+end
+    end
+end)()
+
+-- Matcher
+coroutine.wrap(function()
+    while true do
+        wait(160)
+        game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+          if workspace:FindFirstChild("SeekMovingNewClone") or workspace.CurrentRooms:FindFirstChild("50") then
+          return
+    end
+        wait(0.3)
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Doors-Mode-Remakes/refs/heads/main/Matcher.lua"))()
+        if mat == false then
+        wait(3)
+        mat = true
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/Voor-Pr00/Achivements/refs/heads/main/Voorpr0"))()
+
+---====== Display achievement ======---
+achievementGiver({
+    Title = "No match for me!",
+    Desc = "Encounter Matcher.",
+    Reason = " ",
+    Image = GetGitImage("https://github.com/check78/worldcuuuup/blob/main/MatchBadge.png?raw=true","matchbadge")
+})
+end
+    end
+end)()
+
+-- Silence
+loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/Entities/main/SilenceEndless.txt"))()
+
+-- Greed
+coroutine.wrap(function()
+    while true do
+        wait(400)
+        game.ReplicatedStorage.GameData.LatestRoom.Changed:Wait()
+          if workspace:FindFirstChild("SeekMovingNewClone") or workspace.CurrentRooms:FindFirstChild("50") then
+          return
+    end
+local ded = false
+local gone = false
+local function v15(p12, p13)
+        writefile(p13 .. ".mp3", game:HttpGet(p12))
+        local v144 = Instance.new("Sound")
+        v144.SoundId = (getcustomasset or getsynasset)(p13 .. ".mp3")
+        return v144
+    end
+local vs78 = v15("https://raw.githubusercontent.com/VoorPhale012/Smiler/refs/heads/main/RPReplay_Final1769680177%20(mp3cut.net).mp3?raw=true", "Greed")
+
+local sound = vs78:Clone()
+sound.Name = "GreedSpawn"
+sound.Volume = 5
+sound.Parent = workspace
+sound:Play()
+
+if game.Players.LocalPlayer.Character.Humanoid.Health<=0 then
+   ded = true
+end
+
+game.ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
+if gone == false then
+		if ded == false then
+		    game.Players.LocalPlayer.Character.Humanoid:TakeDamage(100)
+		    ded = true
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/Jumpscares/main/GreedJumpscare.txt"))()
+wait(0.9)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/GuidingLight/refs/heads/main/GreedDie.txt"))()
+		    game:GetService("ReplicatedStorage").GameStats["Player_".. game.Players.LocalPlayer.Name].Total.DeathCause.Value = "Greed"
+		wait(1)
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/Voor-Pr00/Achivements/refs/heads/main/Voorpr0"))()
+
+---====== Display achievement ======---
+achievementGiver({
+ Title = "Too Greedy.",
+ Desc = "Die to Greed",
+ Reason = "",
+ Image = GetGitImage("https://github.com/check78/worldcuuuup/blob/main/GreedBadge1.png?raw=true","GreedyBadge")
+})
+        end
+end
+end)
+
+local tweenColor = game:GetService("TweenService"):Create(game.Lighting.MainColorCorrection, TweenInfo.new(2), {Contrast = -0.19})
+     tweenColor:Play()
+     local tweenSat = game:GetService("TweenService"):Create(game.Lighting.MainColorCorrection, TweenInfo.new(2), {Saturation = -0.19})
+     tweenSat:Play()
+     local TW2 = game.TweenService:Create(game.Lighting.MainColorCorrection, TweenInfo.new(2),{TintColor = Color3.fromRGB(255, 191, 154)})
+		TW2:Play()
+	wait(5.7)
+sound:Play()
+		local tween = game:GetService("TweenService")
+		tween:Create(game.Lighting.MainColorCorrection, TweenInfo.new(4), {Contrast = 0}):Play()
+		tween:Create(game.Lighting.MainColorCorrection, TweenInfo.new(4), {Saturation = 0}):Play()
+		local TW = game.TweenService:Create(game.Lighting.MainColorCorrection, TweenInfo.new(4),{TintColor = Color3.fromRGB(255, 255, 255)})
+		TW:Play()
+		gone = true
+    end
+end)()
+
+-- Claim
+coroutine.wrap(function()
+    task.wait()
+   local jobI = game.JobId
+    local nu = jobI:gsub("%D+", "")
+   local see = tonumber(nu:sub(1, 9)) or os.time()
+    local rn = Random.new(see)
+   local vu1000 = {
+       rn:NextInteger(1, 40),
+rn:NextInteger(41, 60),
+rn:NextInteger(61, 81),
+rn:NextInteger(82, 101)
+}
+    game.ReplicatedStorage.GameData.LatestRoom.Changed:Connect(function()
+        if table.find(vu1000, game.ReplicatedStorage.GameData.LatestRoom.Value) then
+   if workspace:FindFirstChild("SeekMovingNewClone") or workspace.CurrentRooms:FindFirstChild("50") then
+          return
+   end
+loadstring(game:HttpGet("https://raw.githubusercontent.com/DripCapybara/Doors-Mode-Remakes/refs/heads/main/Claim.lua"))()
+if clam == false then
+wait(3)
+clam = true
+local achievementGiver = loadstring(game:HttpGet("https://raw.githubusercontent.com/Voor-Pr00/Achivements/refs/heads/main/Voorpr0"))()
+
+---====== Display achievement ======---
+achievementGiver({
+    Title = "In Sight.",
+    Desc = "Encounter Claim.",
+    Reason = " ",
+    Image = GetGitImage("https://github.com/check78/entity-images/blob/main/InSight.png?raw=true","Im_Not_Playing_These_Games")
+})
+end
+end
+end)
+end)()
+
+workspace.CurrentRooms[game.ReplicatedStorage.GameData.LatestRoom.Value].Assets.ChildAdded:Connect(function(eye)
+	if eye.Name == "LeverForGate" then
+		wait(0.6)
+        if workspace:FindFirstChild("Overseer") then
+        workspace.Overseer:Destroy()
+        end
+	end
+end)
+
+-- No Overseer in Seek Chase
+workspace.ChildAdded:Connect(function(seek)
+	if seek.Name == "SeekMovingNewClone" then
+		wait(0.6)
+		if workspace:FindFirstChild("Overseer") then
+        workspace.Overseer:Destroy()
+        end
+	end
+end)
+
+-- No Overseer and Normal Eyes Combo
+workspace.ChildAdded:Connect(function(seek)
+	if seek.Name == "Eyes" then
+		wait(0.6)
+        if workspace:FindFirstChild("Overseer") then
+        workspace.Overseer:Destroy()
+        end
+	end
+end)
+
+--workspace.Ambience_Seek.SoundId = GetGitSound("https://github.com/check78/worldcuuuup/blob/main/EndlessSeekChase.mp3?raw=true","EndlessSeekChase")
+--workspace.Ambience_Seek.Volume = 5
+    local roast = Instance.new("Sound")
+    roast.Parent = workspace
+    roast.Name = "Omg"
+    roast.SoundId = "rbxassetid://4835664238"
+    roast.Volume = 1
+    roast.Pitch = 1
+    roast.TimePosition = 0.2
+    roast:Play()
+local Sounds = Instance.new("Folder")
+Sounds.Name = "Mimic"
+Sounds.Parent = workspace
+--loadstring(game:HttpGet("https://raw.githubusercontent.com/check78/Endless-Doors-In-Doors/main/TextChatService.lua"))()
