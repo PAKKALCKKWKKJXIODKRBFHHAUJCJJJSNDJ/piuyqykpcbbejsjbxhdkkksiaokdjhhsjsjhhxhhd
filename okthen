@@ -614,6 +614,9 @@ local Content = New("Frame", {
 	Parent = UI
 })
 
+local Pages = {}
+local Tabs = {}
+
 local Structure = Config.Structure
 
 local function ApplyStructure(mode)
@@ -702,9 +705,6 @@ local function ApplyStructure(mode)
 
 	TabList.CanvasPosition = Vector2.zero
 end
-
-local Pages = {}
-local Tabs = {}
 
 local Section
 local Button
