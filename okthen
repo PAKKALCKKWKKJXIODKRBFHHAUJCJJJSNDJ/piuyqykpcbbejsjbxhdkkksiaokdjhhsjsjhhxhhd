@@ -1,4 +1,4 @@
-local function CreateHub(Options)
+local function CreateHub(Options) -- ok
 	Options = Options or {}
 
 	local Players = game:GetService("Players")
@@ -826,24 +826,24 @@ local function SelectTab(index)
 	local oldIndex = CurrentTab
 
 	if oldIndex == index then
-	local page = Pages[index]
+		local page = Pages[index]
 
-	if page then
-		page.Visible = true
-		page.Position = UDim2.fromScale(0, 0)
+		if page then
+			page.Visible = true
+			page.Position = UDim2.fromScale(0, 0)
+		end
+
+		for i, tab in ipairs(Tabs) do
+			Tween(tab, .18, {
+				BackgroundColor3 = i == index
+					and Theme.Accent2
+					or Theme.Tertiary
+			})
+		end
+
+		UpdateTabGradients(index)
+		return
 	end
-
-	for i, tab in ipairs(Tabs) do
-		Tween(tab, .18, {
-			BackgroundColor3 = i == index
-				and Theme.Accent2
-				or Theme.Tertiary
-		})
-	end
-
-	UpdateTabGradients(index)
-	return
-end
 
 	CurrentTab = index
 	TabAnimationId += 1
@@ -853,41 +853,52 @@ end
 	local oldPage = Pages[oldIndex]
 	local newPage = Pages[index]
 
+	local oldOrder = Tabs[oldIndex].LayoutOrder
+	local newOrder = Tabs[index].LayoutOrder
+
 	local direction
 
-	local oldOrder = Tabs[oldIndex].LayoutOrder
-local newOrder = Tabs[index].LayoutOrder
-
-if oldOrder < newOrder then
-	direction = 1
-else
-	direction = -1
-end
-
-	local width = Content.AbsoluteSize.X
-
-	if width <= 0 then
-		width = Content.Size.X.Offset
+	if oldOrder < newOrder then
+		direction = 1
+	else
+		direction = -1
 	end
 
-	if width <= 0 then
-		width = 351
-	end
-
-	local center = UDim2.fromScale(0, 0)
-
+	local center
 	local oldPosition
 	local newStartPosition
 
-	if direction == 1 then
-		oldPosition = UDim2.new(0, 0, -1, 0)
-		newStartPosition = UDim2.new(0, 0, 1, 0)
+	if Structure == "Horizontal" then
+		center = UDim2.fromScale(0, 0)
+
+		if direction == 1 then
+			-- Tab mới ở bên phải
+			-- Page cũ trượt sang trái
+			oldPosition = UDim2.new(-1, 0, 0, 0)
+			newStartPosition = UDim2.new(1, 0, 0, 0)
+		else
+			-- Tab mới ở bên trái
+			-- Page cũ trượt sang phải
+			oldPosition = UDim2.new(1, 0, 0, 0)
+			newStartPosition = UDim2.new(-1, 0, 0, 0)
+		end
 	else
-		oldPosition = UDim2.new(0, 0, 1, 0)
-		newStartPosition = UDim2.new(0, 0, -1, 0)
+		center = UDim2.fromScale(0, 0)
+
+		if direction == 1 then
+			-- Tab mới ở phía dưới
+			-- Page cũ trượt lên
+			oldPosition = UDim2.new(0, 0, -1, 0)
+			newStartPosition = UDim2.new(0, 0, 1, 0)
+		else
+			-- Tab mới ở phía trên
+			-- Page cũ trượt xuống
+			oldPosition = UDim2.new(0, 0, 1, 0)
+			newStartPosition = UDim2.new(0, 0, -1, 0)
+		end
 	end
 
-	for i, page in ipairs(Pages) do
+	for _, page in ipairs(Pages) do
 		if page ~= oldPage and page ~= newPage then
 			page.Visible = false
 		end
@@ -898,6 +909,7 @@ end
 
 	if oldPage and oldPage.Parent then
 		oldPage.Visible = true
+		oldPage.Position = center
 	end
 
 	if newPage and newPage.Parent then
