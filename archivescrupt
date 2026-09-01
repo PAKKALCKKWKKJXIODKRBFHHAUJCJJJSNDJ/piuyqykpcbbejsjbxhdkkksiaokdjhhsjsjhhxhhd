@@ -1,0 +1,1239 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = workspace
+
+local LP = Players.LocalPlayer
+
+local function check(v)
+	if v:IsA("ProximityPrompt") then
+		v.HoldDuration = 0
+	end
+end
+
+for _, v in ipairs(Workspace:GetDescendants()) do
+	check(v)
+end
+
+Workspace.DescendantAdded:Connect(check)
+
+local ClientRemote = game.ReplicatedStorage.FloorReplicated.ClientRemote
+
+local function checkClient(v)
+	if v.Name == "DronesClient" or v.Name == "AlmaClient" then
+		v:Destroy()
+	end
+end
+
+for _, v in ipairs(ClientRemote:GetDescendants()) do
+	checkClient(v)
+end
+
+ClientRemote.DescendantAdded:Connect(checkClient)
+
+local function checkDrones(v)
+	if v:IsA("Model") and v.Name == "Drones" then
+		local root = v:FindFirstChild("Root")
+
+		if root and root:IsA("BasePart") then
+			root:Destroy()
+		end
+	end
+end
+
+for _, v in ipairs(Workspace:GetChildren()) do
+	checkDrones(v)
+end
+
+Workspace.ChildAdded:Connect(checkDrones)
+
+local HEIGHT = 4.5
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+local function isGround(part)
+	if not part:IsA("BasePart") then
+		return false
+	end
+
+	return part.Name == "Floor"
+		or part.Name == "Carpet"
+		or part.Name == "CarpetLight"
+		or part.Name == "Puddle"
+		or string.find(part.Name:lower(), "conveyer", 1, true) ~= nil
+end
+
+local function getGroundY(char, root)
+	local excludes = {char}
+	local origin = root.Position + Vector3.new(0, 5, 0)
+	local direction = Vector3.new(0, -20, 0)
+
+	for _ = 1, 5 do
+		rayParams.FilterDescendantsInstances = excludes
+
+		local result = Workspace:Raycast(origin, direction, rayParams)
+
+		if not result then
+			break
+		end
+
+		if isGround(result.Instance) then
+			return result.Position.Y
+		end
+
+		table.insert(excludes, result.Instance)
+
+		local distance = (result.Position - origin).Magnitude
+
+		origin = result.Position + Vector3.new(0, 0.01, 0)
+		direction = Vector3.new(0, -(100 - distance), 0)
+	end
+end
+
+RunService.Heartbeat:Connect(function()
+	local char = LP.Character
+
+	if not char then
+		return
+	end
+
+	local root = char:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return
+	end
+
+	local groundY = getGroundY(char, root)
+
+	if not groundY then
+		return
+	end
+
+	local targetY = groundY + HEIGHT
+	local pos = root.Position
+
+	local rx, ry, rz = root.CFrame:ToOrientation()
+
+	root.CFrame =
+		CFrame.new(pos.X, targetY, pos.Z) *
+		CFrame.Angles(rx, ry, rz)
+end)
+
+local function setup(char)
+	local Humanoid = char:WaitForChild("Humanoid")
+
+	Humanoid.WalkSpeed = 18
+
+	Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+		if Humanoid.WalkSpeed ~= 18 then
+			Humanoid.WalkSpeed = 18
+		end
+	end)
+end
+
+if LP.Character then
+	setup(LP.Character)
+end
+
+LP.CharacterAdded:Connect(setup)
+
+local RANGE = 10
+local prompts = {}
+local COOLDOWN = 0.1
+local elapsed = 0
+
+local function valid(prompt)
+	return prompt.ActionText == "Obtain"
+		or prompt.ActionText == "Loot"
+		or prompt.ActionText == "Collect"
+end
+
+local function addPrompt(obj)
+	if obj:IsA("ProximityPrompt") and valid(obj) then
+		prompts[obj] = true
+	end
+end
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+	addPrompt(obj)
+end
+
+Workspace.DescendantAdded:Connect(addPrompt)
+
+RunService.Heartbeat:Connect(function(dt)
+	elapsed += dt
+
+	if elapsed < COOLDOWN then
+		return
+	end
+
+	elapsed = 0
+
+	local char = LP.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return
+	end
+
+	for prompt in pairs(prompts) do
+		if not prompt.Parent then
+			prompts[prompt] = nil
+			continue
+		end
+
+		local part = prompt.Parent
+
+		if not part:IsA("BasePart") then
+			part = prompt:FindFirstAncestorWhichIsA("BasePart")
+		end
+
+		if part and (part.Position - root.Position).Magnitude < RANGE then
+			fireproximityprompt(prompt)
+		end
+	end
+end)
+
+local pickupModels = {}
+local PICKUP_COOLDOWN = 0.1
+local pickupElapsed = 0
+
+local function hasPickupAttribute(model)
+	if not model:IsA("Model") then
+		return false
+	end
+
+	for attributeName in pairs(model:GetAttributes()) do
+		local name = attributeName:lower()
+
+		if string.find(name, "pickup", 1, true)
+			or string.find(name, "single", 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function registerPickupModel(obj)
+	if not obj:IsA("Model") then
+		return
+	end
+
+	if obj.Name == "GoldPile" or hasPickupAttribute(obj) then
+		pickupModels[obj] = true
+	end
+end
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+	registerPickupModel(obj)
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+	task.defer(function()
+		registerPickupModel(obj)
+	end)
+end)
+
+RunService.Heartbeat:Connect(function(dt)
+	pickupElapsed += dt
+
+	if pickupElapsed < PICKUP_COOLDOWN then
+		return
+	end
+
+	pickupElapsed = 0
+
+	local char = LP.Character
+	local root = char and char:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return
+	end
+
+	for model in pairs(pickupModels) do
+		if not model.Parent then
+			pickupModels[model] = nil
+			continue
+		end
+
+		local cf = model:GetBoundingBox()
+		local distance = (cf.Position - root.Position).Magnitude
+
+		if distance <= 15 then
+			for _, obj in ipairs(model:GetDescendants()) do
+				if obj:IsA("ProximityPrompt") then
+					local vendingMachine =
+						obj:FindFirstAncestorWhichIsA("Model")
+
+					if vendingMachine
+						and string.find(
+							vendingMachine.Name:lower(),
+							"vendingmachine",
+							1,
+							true
+						) then
+						continue
+					end
+
+					obj.MaxActivationDistance = 20
+					fireproximityprompt(obj)
+				end
+			end
+		end
+	end
+end)
+
+local CurrentRooms = Workspace:WaitForChild("CurrentRooms")
+
+local ESPs = {}
+local Rooms = {}
+local CurrentRoom
+
+local function getHighestRoom()
+	local highest = nil
+	local highestNumber = -math.huge
+
+	for _, obj in ipairs(CurrentRooms:GetChildren()) do
+		if obj:IsA("Model") and tonumber(obj.Name) then
+			local number = tonumber(obj.Name)
+
+			if tostring(number) == obj.Name and number > highestNumber then
+				highestNumber = number
+				highest = obj.Name
+			end
+		end
+	end
+
+	return highest
+end
+
+local function getRoom(obj)
+	local current = obj
+
+	while current and current ~= CurrentRooms do
+		if current.Parent == CurrentRooms then
+			return current
+		end
+
+		current = current.Parent
+	end
+
+	return nil
+end
+
+local function isPointInsideRoom(room, point)
+	local cf, size = room:GetBoundingBox()
+	local relative = cf:PointToObjectSpace(point)
+
+	return math.abs(relative.X) <= size.X * 0.5
+		and math.abs(relative.Y) <= size.Y * 0.5
+		and math.abs(relative.Z) <= size.Z * 0.5
+end
+
+local function getCurrentRoom()
+	local character = LP.Character
+
+	if not character then
+		return nil
+	end
+
+	local root = character:FindFirstChild("HumanoidRootPart")
+
+	if not root then
+		return nil
+	end
+
+	local position = root.Position
+
+	for _, room in ipairs(Rooms) do
+		if room.Parent == CurrentRooms
+			and isPointInsideRoom(room, position) then
+			return room
+		end
+	end
+
+	return nil
+end
+
+local function isInsideLocalPlayerModel(obj)
+	local current = obj.Parent
+
+	while current and current ~= Workspace do
+		if current:IsA("Model") and current.Name == LP.Name then
+			return true
+		end
+
+		current = current.Parent
+	end
+
+	return false
+end
+
+local function addESP(target, color, text, room, alwaysVisible)
+	if isInsideLocalPlayerModel(target) then
+		return
+	end
+
+	if target:FindFirstChild("ESPHighlight") then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+
+	highlight.Name = "ESPHighlight"
+	highlight.Adornee = target
+	highlight.FillColor = color
+	highlight.FillTransparency = 0.75
+	highlight.OutlineColor = color
+	highlight.OutlineTransparency = 0
+	highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	highlight.Enabled = alwaysVisible or room == CurrentRoom
+	highlight.Parent = target
+
+	local billboard = Instance.new("BillboardGui")
+
+	billboard.Name = "ESPBillboard"
+	billboard.Adornee = target
+	billboard.AlwaysOnTop = true
+	billboard.Size = UDim2.fromOffset(90, 20)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+	billboard.MaxDistance = math.huge
+	billboard.Enabled = alwaysVisible or room == CurrentRoom
+	billboard.Parent = target
+
+	local label = Instance.new("TextLabel")
+
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Text = text
+	label.TextColor3 = color
+	label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	label.TextStrokeTransparency = 0
+	label.Font = Enum.Font.Oswald
+	label.TextScaled = true
+	label.Parent = billboard
+
+	ESPs[#ESPs + 1] = {
+		room = room,
+		alwaysVisible = alwaysVisible,
+		highlight = highlight,
+		billboard = billboard
+	}
+end
+
+local function createRoomESP(obj)
+	local isGold =
+		obj:IsA("Model")
+		and obj.Name == "GoldPile"
+
+	local isDoor =
+		obj:IsA("BasePart")
+		and obj.Name == "Door"
+		and obj.Parent
+		and obj.Parent.Name == "Door"
+
+	local isHidingSpot =
+		obj:IsA("Model")
+		and string.find(obj.Name:lower(), "hidingspot", 1, true)
+
+	if not isGold and not isDoor and not isHidingSpot then
+		return
+	end
+
+	local target = obj
+
+	if isDoor then
+		target = obj.Parent
+	end
+
+	if target:FindFirstChild("ESPHighlight") then
+		return
+	end
+
+	local room = getRoom(obj)
+
+	if not room then
+		return
+	end
+
+	local color
+	local text
+
+	if isGold then
+		color = Color3.fromRGB(255, 255, 0)
+		text = obj.Name
+
+	elseif isDoor then
+		color = Color3.fromRGB(0, 255, 0)
+		text = "Door [" .. (getHighestRoom() or "?") .. "]"
+
+	else
+		color = Color3.fromRGB(255, 255, 255)
+		text = obj.Name
+	end
+
+	addESP(target, color, text, room, false)
+end
+
+local CaptionedModels = {}
+
+local function hasValidAttribute(model)
+	for attributeName in pairs(model:GetAttributes()) do
+		local name = attributeName:lower()
+
+		if string.find(name, "single", 1, true)
+			or string.find(name, "pickup", 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function checkAttributeModel(obj)
+	if not obj:IsA("Model") then
+		return
+	end
+
+	if obj.Name == "GoldPile" then
+		return
+	end
+
+	if not hasValidAttribute(obj) then
+		return
+	end
+
+	if not CaptionedModels[obj] then
+		CaptionedModels[obj] = true
+
+		task.spawn(function()
+			local MainGame = require(
+				LP.PlayerGui.MainUI.Initiator.Main_Game
+			)
+
+			MainGame.caption(
+				"An item has spawned: '" .. obj.Name .. "'"
+			)
+		end)
+	end
+
+	if obj:FindFirstChild("ESPHighlight") then
+		return
+	end
+
+	addESP(
+		obj,
+		Color3.fromRGB(0, 170, 255),
+		obj.Name,
+		nil,
+		true
+	)
+end
+
+local function registerRoom(room)
+	if not room:IsA("Model") then
+		return
+	end
+
+	for _, existing in ipairs(Rooms) do
+		if existing == room then
+			return
+		end
+	end
+
+	Rooms[#Rooms + 1] = room
+
+	for _, obj in ipairs(room:GetDescendants()) do
+		createRoomESP(obj)
+	end
+end
+
+local function updateRoomESP(room)
+	if CurrentRoom == room then
+		return
+	end
+
+	CurrentRoom = room
+
+	for _, esp in ipairs(ESPs) do
+		if not esp.alwaysVisible then
+			if esp.highlight.Parent and esp.billboard.Parent then
+				local enabled = esp.room == room
+
+				esp.highlight.Enabled = enabled
+				esp.billboard.Enabled = enabled
+			end
+		end
+	end
+end
+
+for _, room in ipairs(CurrentRooms:GetChildren()) do
+	registerRoom(room)
+end
+
+for _, obj in ipairs(CurrentRooms:GetDescendants()) do
+	createRoomESP(obj)
+end
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+	checkAttributeModel(obj)
+end
+
+CurrentRooms.ChildAdded:Connect(function(room)
+	task.defer(function()
+		registerRoom(room)
+
+		local newRoom = getCurrentRoom()
+
+		if newRoom ~= CurrentRoom then
+			updateRoomESP(newRoom)
+		end
+	end)
+end)
+
+CurrentRooms.DescendantAdded:Connect(function(obj)
+	task.defer(function()
+		createRoomESP(obj)
+	end)
+end)
+
+Workspace.DescendantAdded:Connect(function(obj)
+	task.defer(function()
+		checkAttributeModel(obj)
+	end)
+end)
+
+task.spawn(function()
+	while true do
+		local room = getCurrentRoom()
+
+		if room ~= CurrentRoom then
+			updateRoomESP(room)
+		end
+
+		task.wait(0.5)
+	end
+end)
+
+local Camera = Workspace.CurrentCamera
+
+local Tracers = {}
+
+local function getLabel(target)
+	local billboard = target:FindFirstChild("ESPBillboard")
+
+	if not billboard then
+		return nil
+	end
+
+	return billboard:FindFirstChildWhichIsA("TextLabel")
+end
+
+local function createTracer(esp)
+	local highlight = esp.highlight
+
+	if not highlight or not highlight.Parent then
+		return
+	end
+
+	if Tracers[highlight] then
+		return
+	end
+
+	local line = Drawing.new("Line")
+	line.Thickness = 1.5
+	line.Transparency = 1
+	line.Visible = false
+
+	Tracers[highlight] = line
+end
+
+local function removeTracer(highlight)
+	local line = Tracers[highlight]
+
+	if line then
+		line:Remove()
+		Tracers[highlight] = nil
+	end
+end
+
+local function removeESP(esp)
+if not esp then
+return
+end
+
+if esp.highlight then
+	removeTracer(esp.highlight)
+
+	if esp.highlight.Parent then
+		esp.highlight:Destroy()
+	end
+end
+
+if esp.billboard and esp.billboard.Parent then
+	esp.billboard:Destroy()
+end
+
+for i = #ESPs, 1, -1 do
+	if ESPs[i] == esp then
+		table.remove(ESPs, i)
+		break
+	end
+end
+
+end
+
+Workspace.DescendantRemoving:Connect(function(obj)
+for i = #ESPs, 1, -1 do
+local esp = ESPs[i]
+
+	local highlight = esp.highlight
+	local billboard = esp.billboard
+
+	if (highlight and (highlight == obj or highlight:IsDescendantOf(obj)))
+		or (billboard and (billboard == obj or billboard:IsDescendantOf(obj)))
+		or (highlight and highlight.Adornee == obj)
+		or (billboard and billboard.Adornee == obj) then
+
+		removeESP(esp)
+	end
+end
+
+end)
+
+RunService.RenderStepped:Connect(function()
+	Camera = Workspace.CurrentCamera
+
+	for _, esp in ipairs(ESPs) do
+		local highlight = esp.highlight
+		local billboard = esp.billboard
+
+if not highlight
+	or not highlight.Parent
+	or not billboard
+	or not billboard.Parent then
+
+		removeESP(esp)
+		continue
+end
+
+		createTracer(esp)
+
+		local line = Tracers[highlight]
+
+		if not line then
+			continue
+		end
+
+		local target = highlight.Adornee or billboard.Adornee
+
+		if not target then
+			line.Visible = false
+			continue
+		end
+
+		local position
+
+		if target:IsA("Model") then
+			local cf = target:GetBoundingBox()
+			position = cf.Position
+
+		elseif target:IsA("BasePart") then
+			position = target.Position
+
+		else
+			line.Visible = false
+			continue
+		end
+
+		local screenPos, onScreen =
+			Camera:WorldToViewportPoint(position)
+
+		local label = getLabel(target)
+
+		if not label
+			or not billboard.Enabled
+			or not onScreen
+			or screenPos.Z <= 0 then
+
+			line.Visible = false
+			continue
+		end
+
+		local viewport = Camera.ViewportSize
+
+		local from = Vector2.new(
+			viewport.X / 2,
+			viewport.Y
+		)
+
+		local to = Vector2.new(
+			screenPos.X,
+			screenPos.Y
+		)
+
+		line.From = from
+		line.To = to
+		line.Color = label.TextColor3
+		line.Visible = true
+	end
+end)
+
+local function isStardust(obj)
+	return obj:IsA("Model")
+		and string.find(
+			obj.Name:lower(),
+			"stardust",
+			1,
+			true
+		) ~= nil
+end
+
+local function checkStardust(obj)
+	if not isStardust(obj) then
+		return
+	end
+
+	if isInsideLocalPlayerModel(obj) then
+		return
+	end
+
+	if obj:FindFirstChild("ESPHighlight") then
+		return
+	end
+
+	addESP(
+		obj,
+		Color3.fromRGB(255, 255, 0),
+		"Stardust",
+		nil,
+		true
+	)
+end
+
+for _, obj in ipairs(Workspace:GetDescendants()) do
+	checkStardust(obj)
+end
+
+Workspace.DescendantAdded:Connect(function(obj)
+	task.defer(function()
+		checkStardust(obj)
+	end)
+end)
+
+local BashCaptioned = {}
+local ScribblesCaptioned = {}
+
+local BASH_COLOR = Color3.fromRGB(255, 0, 0)
+local SCRIBBLES_COLOR = Color3.fromRGB(255, 255, 255)
+
+local BashGui
+local BashLabel
+
+local ScribblesGui
+local ScribblesLabel
+
+local function createBashGui()
+	if BashGui and BashGui.Parent then
+		return
+	end
+
+	BashGui = Instance.new("ScreenGui")
+	BashGui.Name = "BashGui"
+	BashGui.IgnoreGuiInset = true
+	BashGui.ResetOnSpawn = false
+	BashGui.Enabled = false
+	BashGui.Parent = LP:WaitForChild("PlayerGui")
+
+	BashLabel = Instance.new("TextLabel")
+	BashLabel.Name = "BashLabel"
+	BashLabel.AnchorPoint = Vector2.new(0.5, 0)
+	BashLabel.Position = UDim2.new(0.5, 0, 0, 2)
+	BashLabel.Size = UDim2.fromOffset(180, 32)
+	BashLabel.BackgroundTransparency = 1
+	BashLabel.Text = "Bash is here"
+	BashLabel.TextColor3 = BASH_COLOR
+	BashLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	BashLabel.TextStrokeTransparency = 0.1
+	BashLabel.Font = Enum.Font.Oswald
+	BashLabel.TextScaled = true
+	BashLabel.Parent = BashGui
+end
+
+local function createScribblesGui()
+	if ScribblesGui and ScribblesGui.Parent then
+		return
+	end
+
+	ScribblesGui = Instance.new("ScreenGui")
+	ScribblesGui.Name = "ScribblesGui"
+	ScribblesGui.IgnoreGuiInset = true
+	ScribblesGui.ResetOnSpawn = false
+	ScribblesGui.Enabled = false
+	ScribblesGui.Parent = LP:WaitForChild("PlayerGui")
+
+	ScribblesLabel = Instance.new("TextLabel")
+	ScribblesLabel.Name = "ScribblesLabel"
+	ScribblesLabel.AnchorPoint = Vector2.new(0.5, 0)
+	ScribblesLabel.Position = UDim2.new(0.5, 0, 0, 2)
+	ScribblesLabel.Size = UDim2.fromOffset(220, 32)
+	ScribblesLabel.BackgroundTransparency = 1
+	ScribblesLabel.Text = "Scribbles is here"
+	ScribblesLabel.TextColor3 = SCRIBBLES_COLOR
+	ScribblesLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+	ScribblesLabel.TextStrokeTransparency = 0.1
+	ScribblesLabel.Font = Enum.Font.Oswald
+	ScribblesLabel.TextScaled = true
+	ScribblesLabel.Parent = ScribblesGui
+end
+
+local function isBashModel(obj)
+	return obj:IsA("Model")
+		and string.find(
+			obj.Name:lower(),
+			"bash",
+			1,
+			true
+		) ~= nil
+end
+
+local function isScribblesModel(obj)
+	return obj:IsA("Model")
+		and string.find(
+			obj.Name:lower(),
+			"scribbles",
+			1,
+			true
+		) ~= nil
+end
+
+local function updateBashGui()
+	local found = false
+
+	for model in pairs(BashCaptioned) do
+		if model.Parent and model:IsDescendantOf(Workspace) then
+			found = true
+			break
+		end
+	end
+
+	if BashGui then
+		BashGui.Enabled = found
+	end
+end
+
+local function updateScribblesGui()
+	local found = false
+
+	for model in pairs(ScribblesCaptioned) do
+		if model.Parent and model:IsDescendantOf(Workspace) then
+			found = true
+			break
+		end
+	end
+
+	if ScribblesGui then
+		ScribblesGui.Enabled = found
+	end
+end
+
+local function checkBash(obj)
+	if not isBashModel(obj) then
+		return
+	end
+
+	if isInsideLocalPlayerModel(obj) then
+		return
+	end
+
+	if BashCaptioned[obj] then
+		return
+	end
+
+	local part = obj:FindFirstChildWhichIsA("BasePart", true)
+
+	if not part then
+		return
+	end
+
+	BashCaptioned[obj] = true
+
+	createBashGui()
+
+	task.spawn(function()
+		local MainGame = require(
+			LP.PlayerGui.MainUI.Initiator.Main_Game
+		)
+
+		MainGame.caption(
+			"An entity has spawned: '" .. obj.Name .. "'"
+		)
+	end)
+
+	if not obj:FindFirstChild("ESPHighlight") then
+		addESP(
+			obj,
+			BASH_COLOR,
+			"Bash",
+			nil,
+			true
+		)
+	end
+
+	updateBashGui()
+end
+
+local function checkScribbles(obj)
+	if not isScribblesModel(obj) then
+		return
+	end
+
+	if isInsideLocalPlayerModel(obj) then
+		return
+	end
+
+	if ScribblesCaptioned[obj] then
+		return
+	end
+
+	local part = obj:FindFirstChildWhichIsA("BasePart", true)
+
+	if not part then
+		return
+	end
+
+	ScribblesCaptioned[obj] = true
+
+	createScribblesGui()
+
+	task.spawn(function()
+		local MainGame = require(
+			LP.PlayerGui.MainUI.Initiator.Main_Game
+		)
+
+		MainGame.caption(
+			"An entity has spawned: '" .. obj.Name .. "'"
+		)
+	end)
+
+	if not obj:FindFirstChild("ESPHighlight") then
+		addESP(
+			obj,
+			SCRIBBLES_COLOR,
+			"Scribbles",
+			nil,
+			true
+		)
+	end
+
+	updateScribblesGui()
+end
+
+for _, obj in ipairs(Workspace:GetChildren()) do
+	checkBash(obj)
+	checkScribbles(obj)
+end
+
+Workspace.ChildAdded:Connect(function(obj)
+	task.defer(function()
+		checkBash(obj)
+		checkScribbles(obj)
+
+		for _, descendant in ipairs(obj:GetDescendants()) do
+			checkBash(descendant)
+			checkScribbles(descendant)
+		end
+	end)
+end)
+
+Workspace.ChildRemoved:Connect(function(obj)
+	if isBashModel(obj) then
+		task.defer(function()
+			BashCaptioned[obj] = nil
+			updateBashGui()
+		end)
+	end
+
+	if isScribblesModel(obj) then
+		task.defer(function()
+			ScribblesCaptioned[obj] = nil
+			updateScribblesGui()
+		end)
+	end
+end)
+
+local NEXT_DOOR_COLOR = Color3.fromRGB(255, 170, 0)
+
+local NextDoorTargets = {}
+
+local function findPlayerModel(room)
+	if not room or not room:IsA("Model") then
+		return nil
+	end
+
+	local playerName = LP.Name:lower()
+	local displayName = LP.DisplayName:lower()
+
+	for _, obj in ipairs(room:GetDescendants()) do
+		if obj:IsA("Model") then
+			local name = obj.Name:lower()
+
+			if string.find(name, playerName, 1, true)
+				or string.find(name, displayName, 1, true) then
+				return obj
+			end
+		end
+	end
+end
+
+local function setupNextDoor(room)
+	if not room:IsA("Model") then
+		return
+	end
+
+	local playerModel = findPlayerModel(room)
+
+	if not playerModel then
+		return
+	end
+
+	local vineDoors = {}
+
+	for _, obj in ipairs(playerModel:GetDescendants()) do
+		if obj:IsA("Model")
+			and obj.Name == "ForgetMeNotVineDoors" then
+
+			local base = obj:FindFirstChild("Base", true)
+
+			if base and base:IsA("BasePart") then
+				vineDoors[#vineDoors + 1] = {
+					model = obj,
+					base = base
+				}
+			end
+		end
+	end
+
+	if #vineDoors == 0 then
+		return
+	end
+
+	local beforeLights
+
+	for _, obj in ipairs(playerModel:GetDescendants()) do
+		if obj:IsA("Model")
+			and obj.Name == "BeforeLights" then
+
+			beforeLights = obj
+			break
+		end
+	end
+
+	if not beforeLights then
+		return
+	end
+
+	local roomDoor =
+		beforeLights:FindFirstChild("RoomDoor", true)
+
+	if not roomDoor
+		or not roomDoor:IsA("BasePart") then
+		return
+	end
+
+	local closest
+	local closestDistance = math.huge
+
+	for _, data in ipairs(vineDoors) do
+		local distance =
+			(data.base.Position - roomDoor.Position).Magnitude
+
+		if distance < closestDistance then
+			closestDistance = distance
+			closest = data
+		end
+	end
+
+	if not closest then
+		return
+	end
+
+	local oldTarget = NextDoorTargets[room]
+
+	if oldTarget == closest.model then
+		return
+	end
+
+	if oldTarget then
+		for _, esp in ipairs(ESPs) do
+			if esp.highlight
+				and esp.highlight.Adornee == oldTarget then
+				removeESP(esp)
+				break
+			end
+		end
+	end
+
+	NextDoorTargets[room] = closest.model
+
+	if not closest.model:FindFirstChild("ESPHighlight") then
+		addESP(
+			closest.model,
+			NEXT_DOOR_COLOR,
+			"Next Door",
+			nil,
+			true
+		)
+	end
+end
+
+local function processNextDoor(room)
+	task.spawn(function()
+		for _ = 1, 50 do
+			if not room.Parent then
+				return
+			end
+
+			setupNextDoor(room)
+
+			if NextDoorTargets[room] then
+				return
+			end
+
+			task.wait(0.1)
+		end
+	end)
+end
+
+CurrentRooms.ChildAdded:Connect(function(room)
+	if not room:IsA("Model") then
+		return
+	end
+
+	processNextDoor(room)
+end)
+
+for _, room in ipairs(CurrentRooms:GetChildren()) do
+	if room:IsA("Model") then
+		processNextDoor(room)
+	end
+end
+
+local Lighting = game:GetService("Lighting")
+
+local function update()
+	Lighting.Brightness = 2
+	Lighting.ClockTime = 14
+	Lighting.FogEnd = 100000
+	Lighting.GlobalShadows = false
+	Lighting.ExposureCompensation = 1
+end
+
+update()
+
+Lighting:GetPropertyChangedSignal("Brightness"):Connect(update)
+Lighting:GetPropertyChangedSignal("ClockTime"):Connect(update)
+Lighting:GetPropertyChangedSignal("FogEnd"):Connect(update)
+Lighting:GetPropertyChangedSignal("GlobalShadows"):Connect(update)
+Lighting:GetPropertyChangedSignal("ExposureCompensation"):Connect(update)
