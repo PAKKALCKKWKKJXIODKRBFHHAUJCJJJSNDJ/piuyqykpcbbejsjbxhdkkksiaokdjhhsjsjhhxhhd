@@ -1,6 +1,14 @@
 local spawnCount = 0
 local blueSound
 
+local speed
+
+if getgenv().FasterTrouble then
+speed = 225
+else
+speed = 180
+end
+
 local function SpawnRebound()
 
 function GetGitSound(GithubSnd,SoundName)
@@ -42,7 +50,7 @@ local entity = Spawner:Create({
 		Values = {7.5, 15, 0.1, 2} -- Magnitude, Roughness, FadeIn, FadeOut
 	},
 	Movement = {
-		Speed = 180 + (spawnCount - 1) * 10, 
+		Speed = speed + (spawnCount - 1) * 10, 
 		Delay = 5,
 		Reversed = math.random(1, 2) == 1
 	},
