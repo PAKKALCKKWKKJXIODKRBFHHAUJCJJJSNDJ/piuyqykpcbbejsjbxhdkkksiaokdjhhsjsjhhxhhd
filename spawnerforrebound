@@ -645,8 +645,14 @@ Module.Create = function(self, config: any): any?
         success, entityModel = true, asset
     elseif typeof(asset) == "string" then
         success, entityModel = pcall(function()
-			local instance: Instance? = LoadCustomInstance(asset)
-			if typeof(instance) == "Instance" then
+            if asset:match("%.txt$") then
+                local temp = "temp_entity.rbxmx"
+                writefile(temp, game:HttpGet(asset))
+                asset = temp
+            end
+
+            local instance: Instance? = LoadCustomInstance(asset)
+            if typeof(instance) == "Instance" then
                 if instance.ClassName ~= "Model" then
                     error(string.format(
                         debug.traceback("Entity model Instance invalid, expected Model but got '%s'"),
@@ -720,6 +726,7 @@ Module.Create = function(self, config: any): any?
         end,
         Resume = function(self)
             if self:IsAlive() then
+                self.ResumeFromRoomStart = true
                 self.Model:SetAttribute("Paused", false)
             end
         end,
