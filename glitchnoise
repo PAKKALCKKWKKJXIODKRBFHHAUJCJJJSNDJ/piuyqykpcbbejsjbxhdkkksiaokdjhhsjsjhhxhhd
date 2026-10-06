@@ -86,42 +86,6 @@ local latest = game.ReplicatedStorage.GameData:WaitForChild("LatestRoom")
 
 local room = rooms:FindFirstChild(tostring(latest.Value))
 
-if room then
-	local objs = {}
-
-	for _, v in ipairs(room:GetDescendants()) do
-		if v:IsA("MeshPart") and v.Name == "Door" and (v.Parent.Name == "Door" or v.Parent.Name == "DoorNormal") then
-			objs[#objs + 1] = v
-		elseif v:IsA("Model") and v.Name == "Wardrobe" then
-			objs[#objs + 1] = v
-		end
-	end
-
-	if #objs > 0 then
-		local obj2 = objs[math.random(1, #objs)]
-		local cf2 = obj2:IsA("Model") and obj2:GetPivot() or obj2.CFrame
-
-		local off = obj2:IsA("Model") and 4 or -4
-		local right = obj2:IsA("Model") and 6 or -6
-		local rotye = obj2:IsA("Model") and -30 or 30
-
-		local pos = cf2.Position
-			+ cf2.LookVector * off
-			+ cf2.RightVector * right
-			+ Vector3.new(0, -1, 0)
-
-		local tvcf = CFrame.lookAt(
-			pos,
-			pos - cf2.LookVector
-		) * CFrame.Angles(0, math.rad(rotye), 0)
-
-		if tv:IsA("Model") then
-			tv:PivotTo(tvcf)
-		elseif tv:IsA("BasePart") then
-			tv.CFrame = tvcf
-		end
-	end
-end
 
 local tvmain = tv:FindFirstChild("TVMain", true)
 local tvcamcon
