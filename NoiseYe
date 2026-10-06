@@ -1,0 +1,898 @@
+local rs = game:GetService("RunService")
+local lpla = game:GetService("Players").LocalPlayer
+local char = lpla.Character or lpla.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local hum = char:WaitForChild("Humanoid")
+local ts = game:GetService("TweenService")
+local CameraShaker = require(game.ReplicatedStorage:WaitForChild("CameraShaker"))
+local camera = workspace.CurrentCamera
+
+local spawnShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+	camera.CFrame = camera.CFrame * shakeCf
+end)
+
+spawnShake:Start()
+
+local tvurl = "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Place_6839171747_Model_TV_Stand_1791097116.txt"
+local noiseurl = "https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Place_6839171747_Model_NoiseModelwa_1791097311.txt"
+
+local path = {}
+local start = tick()
+local dead = false
+local paused = false
+local frozen = false
+local far = false
+local basespeed = 8
+local ogIdleVolume
+local baserot = 4
+local speed = basespeed
+local rotspd = baserot
+local footstepog
+
+local conns = {}
+local touchconns = {}
+
+local walktrack
+local killtrack
+local camcon
+
+local colors = {}
+local texcolors = {}
+local lights = {}
+
+local playicon
+local pauseicon
+local pauseblack
+local idle
+local kill
+local pause
+local flizzleSound
+local fastfor
+local fastcon
+local fizzlepart
+local footstep
+
+local pathtime = 0
+
+rs.Heartbeat:Connect(function(dt)
+	if not dead and hrp.Parent then
+		if far then
+			pathtime += dt
+
+			if pathtime < 0.03 then
+				return
+			end
+
+			pathtime = 0
+		end
+
+		path[#path + 1] = {
+			t = tick() - start,
+			p = hrp.Position
+		}
+	end
+end)
+
+local function load(url, file)
+	if not isfile(file) then
+		writefile(file, game:HttpGet(url))
+	end
+
+	return game:GetObjects(getcustomasset(file))[1]
+end
+
+local tv = load(tvurl, "TV_Stand.txt")
+tv.Parent = workspace
+tv.Name = "TvStand" 
+
+local rooms = workspace:WaitForChild("CurrentRooms")
+local latest = game.ReplicatedStorage.GameData:WaitForChild("LatestRoom")
+
+local room = rooms:FindFirstChild(tostring(latest.Value))
+
+if room then
+	local objs = {}
+
+	for _, v in ipairs(room:GetDescendants()) do
+		if v:IsA("MeshPart") and v.Name == "Door" and (v.Parent.Name == "Door" or v.Parent.Name == "DoorNormal") then
+			objs[#objs + 1] = v
+		elseif v:IsA("Model") and v.Name == "Wardrobe" then
+			objs[#objs + 1] = v
+		end
+	end
+
+	if #objs > 0 then
+		local obj2 = objs[math.random(1, #objs)]
+		local cf2 = obj2:IsA("Model") and obj2:GetPivot() or obj2.CFrame
+
+		local off = obj2:IsA("Model") and 4 or -4
+		local right = obj2:IsA("Model") and 6 or -6
+		local rotye = obj2:IsA("Model") and -30 or 30
+
+		local pos = cf2.Position
+			+ cf2.LookVector * off
+			+ cf2.RightVector * right
+			+ Vector3.new(0, -1, 0)
+
+		local tvcf = CFrame.lookAt(
+			pos,
+			pos - cf2.LookVector
+		) * CFrame.Angles(0, math.rad(rotye), 0)
+
+		if tv:IsA("Model") then
+			tv:PivotTo(tvcf)
+		elseif tv:IsA("BasePart") then
+			tv.CFrame = tvcf
+		end
+	end
+end
+
+task.wait(4)
+
+local obj = load(noiseurl, "NoiseModel.txt")
+obj.Parent = workspace
+
+local tcf = tv:IsA("Model") and tv:GetPivot() or tv.CFrame
+local cf = tcf * CFrame.new(0, 0.5, -4)
+
+local function killModel()
+	if dead then
+		return
+	end
+
+	dead = true
+	paused = false
+
+	if walktrack then
+		walktrack:AdjustSpeed(0)
+	end
+	
+	local pos = hrp.Position + hrp.CFrame.LookVector * 5
+local rot = obj:GetPivot().Rotation
+obj:PivotTo(CFrame.new(pos) * rot)
+
+	local oldspeed = hum.WalkSpeed
+
+local lpla = game:GetService("Players").LocalPlayer
+local hum = lpla.Character or lpla.CharacterAdded:Wait()
+hum = hum:WaitForChild("Humanoid")
+
+task.spawn(function() 
+while hum.Parent do
+	hum.WalkSpeed = 0
+	task.wait()
+	end
+end) 
+
+
+
+spawnShake:ShakeOnce(
+	7,   -- Magnitude (mạnh)
+	10,   -- Roughness
+	0.1, -- FadeIn
+	3, -- FadeOut
+	0,    -- PositionInfluence
+	0.8   -- RotationInfluence
+)
+
+local nhead = obj:FindFirstChild("Head", true)
+local phead = char:FindFirstChild("HumanoidRootPart")
+local cam = workspace.CurrentCamera
+
+if nhead and phead and nhead:IsA("BasePart") then
+	cam.CameraType = Enum.CameraType.Scriptable
+
+camcon = rs.RenderStepped:Connect(function()
+	if nhead.Parent and phead.Parent and hum.Health > 0 then
+		local pos = obj:GetPivot().Position
+		local dir = phead.Position - pos
+
+		if dir.Magnitude > 0.01 then
+			obj:PivotTo(
+				CFrame.lookAt(pos, pos + dir.Unit)
+			)
+		end
+
+		cam.CFrame = CFrame.lookAt(
+			cam.CFrame.Position,
+			nhead.Position
+		)
+	end
+end)
+end
+
+	local anims = obj:FindFirstChild("Animations")
+	local animator = obj:FindFirstChildOfClass("AnimationController")
+		and obj.AnimationController:FindFirstChildOfClass("Animator")
+
+	local kanim
+
+	if anims and animator then
+		kanim = anims:FindFirstChild("Kill")
+			or anims:FindFirstChild("KillPlayer")
+
+		if kanim and kanim:IsA("Animation") then
+			killtrack = animator:LoadAnimation(kanim)
+			killtrack:Play()
+		end
+	end
+
+	if kill then
+		kill:Play()
+	end
+	
+	if idle then
+	idle:Stop() 
+	end
+
+	local sounddone = not kill or not kill.IsPlaying
+	local animdone = not killtrack
+
+	if kill then
+		task.spawn(function()
+			task.wait(1.9)
+			sounddone = true
+		end)
+	end
+
+	if killtrack then
+		task.spawn(function()
+			task.wait(1.6)
+			animdone = true
+		end)
+	end
+
+
+
+	while not sounddone or not animdone do
+		task.wait()
+	end
+	
+	local lpla = game:GetService("Players").LocalPlayer
+local gui = lpla:WaitForChild("PlayerGui")
+
+local sg = Instance.new("ScreenGui")
+sg.Name = "BlackFrame"
+sg.IgnoreGuiInset = true
+sg.ResetOnSpawn = false
+sg.Parent = gui
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.fromScale(1, 1)
+frame.BackgroundColor3 = Color3.new(0, 0, 0)
+frame.BorderSizePixel = 0
+frame.Parent = sg
+	
+	task.wait(2)
+
+	for _, c in ipairs(conns) do
+		pcall(function()
+			c:Disconnect()
+		end)
+	end
+
+	table.clear(conns)
+
+	if camcon then
+		camcon:Disconnect()
+		camcon = nil
+	end
+
+	if killtrack then
+		killtrack:Stop()
+	end
+
+	if obj and obj.Parent then
+		obj:Destroy()
+	end
+
+	if tv and tv.Parent then
+		tv:Destroy()
+	end
+
+	if hum.Parent then
+		hum:TakeDamage(10000)
+		task.wait(1.3)
+		sg:Destroy()
+	end
+end
+
+local function checkTouch()
+	if dead or paused or not obj:IsA("Model") then
+		return
+	end
+
+	local cf, size = obj:GetBoundingBox()
+	local parts = workspace:GetPartBoundsInBox(
+		hrp.CFrame,
+		Vector3.new(1.5, 3, 1.5)
+	)
+
+	for _, v in ipairs(parts) do
+		if v:IsDescendantOf(obj) then
+			killModel()
+			break
+		end
+	end
+end
+
+local function playPath(model)
+	if #path == 0 then
+		return
+	end
+
+local i = 1
+
+
+	while model.Parent and not dead do
+	if frozen then
+		rs.Heartbeat:Wait()
+	elseif paused and not far then
+			rs.Heartbeat:Wait()
+		elseif path[i] then
+			local target = path[i].p
+			local mcf = model:GetPivot()
+			local pos = mcf.Position
+			local dis = (target - pos).Magnitude
+
+			if dis < 0.15 then
+				i += 1
+			else
+				local dt = rs.Heartbeat:Wait()
+
+				if (paused and not far) or dead then
+					continue
+				end
+
+				local step = math.min(speed * dt, dis)
+				local p = pos + (target - pos).Unit * step
+
+				local rot = mcf.Rotation
+local lookp = target
+
+if far then
+	local n = math.min(i + 10, #path)
+	lookp = path[n].p
+end
+
+local dir = lookp - p
+
+if dir.Magnitude > 0.01 then
+	local want = CFrame.lookAt(p, p + dir.Unit)
+
+		rot = mcf:Lerp(
+			want,
+			math.clamp(rotspd * dt, 0, 1)
+		).Rotation
+end
+				
+	
+
+				model:PivotTo(CFrame.new(p) * rot)
+			end
+		else
+			rs.Heartbeat:Wait()
+		end
+	end
+end
+
+local function pauseModel()
+	if paused or dead or frozen then
+		return
+	end
+	
+	footstep:Stop() 
+
+	paused = true
+	idle.Volume = 0.08
+	
+
+	if walktrack then
+		walktrack:AdjustSpeed(0)
+	end
+
+	for _, v in ipairs(obj:GetDescendants()) do
+		if v:IsA("BasePart") then
+			if colors[v] == nil then
+				colors[v] = v.Color
+			end
+
+			v.Color = Color3.new(0, 0, 0)
+		elseif v:IsA("PointLight") then
+			if lights[v] == nil then
+				lights[v] = v.Color
+			end
+
+			v.Color = Color3.fromRGB(0, 0, 255)
+		end
+	end
+
+	if pause then
+		pause:Play()
+	end
+
+	if pauseicon then
+		pauseicon.Enabled = true
+	end
+
+	if pauseblack then
+		pauseblack.Enabled = true
+	end
+
+	if playicon then
+		playicon.Enabled = false
+	end
+end
+
+local function resumeModel()
+	if not paused or dead or frozen then
+		return
+	end
+
+footstep.Looped = true
+footstep:Play() 
+	paused = false
+	idle.Volume = ogIdleVolume
+
+	if walktrack then
+		walktrack:AdjustSpeed(1)
+	end
+
+	for v, color in pairs(colors) do
+		if v.Parent then
+			v.Color = color
+		end
+	end
+
+	for v, color in pairs(lights) do
+		if v.Parent then
+			v.Color = color
+		end
+	end
+
+	if pauseicon then
+		pauseicon.Enabled = false
+	end
+
+	if pauseblack then
+		pauseblack.Enabled = false
+	end
+
+	if playicon then
+		playicon.Enabled = true
+	end
+end
+
+if obj:IsA("Model") then
+	obj:PivotTo(cf)
+
+	local anims = obj:FindFirstChild("Animations")
+	local spawn = anims and anims:FindFirstChild("Spawn")
+
+	local con = obj:FindFirstChildOfClass("AnimationController")
+		or Instance.new("AnimationController")
+
+	con.Parent = obj
+
+	local animator = con:FindFirstChildOfClass("Animator")
+		or Instance.new("Animator")
+
+	animator.Parent = con
+
+	if spawn and spawn:IsA("Animation") then
+		local track = animator:LoadAnimation(spawn)
+		track:Play()
+
+		for _, v in ipairs(obj:GetDescendants()) do
+			if v:IsA("Sound") and v.Name == "Emerge" then
+				v:Play()
+			end
+		end
+
+		track.Ended:Wait()
+
+		for _, v in ipairs(obj:GetDescendants()) do
+			if v:IsA("ParticleEmitter") and v.Name == "PlayIcon" then
+				playicon = v
+				v.Enabled = true
+			elseif v:IsA("ParticleEmitter") and v.Name == "PauseIcon" then
+				pauseicon = v
+				v.Enabled = false
+			elseif v:IsA("ParticleEmitter") and v.Name == "PauseBlack" then
+				pauseblack = v
+				v.Enabled = false
+			elseif v:IsA("Sound") and v.Name == "Idle" then
+				idle = v
+				ogIdleVolume = v.Volume
+			elseif v:IsA("Sound") and v.Name == "KillPlayer" then
+				kill = v
+			elseif v:IsA("Sound") and v.Name == "Pause" then
+				pause = v
+				elseif v:IsA("Sound") and v.Name == "Fizzle" then
+				flizzleSound = v
+				elseif v:IsA("Sound") and v.Name == "FastForward" then
+				fastfor = v
+				elseif v:IsA("ParticleEmitter") and v.Name == "FFIcon" then
+				fastcon = v
+				elseif v:IsA("ParticleEmitter") and v.Name == "FizzleParticle" then
+				fizzlepart = v
+				elseif v:IsA("Sound") and v.Name == "Footstep" then
+				footstep = v
+				footstepog = v.PlaybackSpeed
+			end
+		end
+
+		local walk = anims and anims:FindFirstChild("Walk")
+
+if walk and walk:IsA("Animation") then
+	walktrack = animator:LoadAnimation(walk)
+
+	walktrack:Play()
+
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Style = Enum.ProximityPromptStyle.Custom
+	prompt.HoldDuration = 5
+	prompt.Parent = tv
+
+	prompt.Triggered:Connect(function(plr)
+	if plr ~= lpla or frozen then
+		return
+	end
+
+	frozen = true
+	paused = true
+	far = false
+
+	if walktrack then
+		walktrack:AdjustSpeed(0)
+	end
+
+	local click = Instance.new("Sound")
+	click.Parent = workspace
+	click.Volume = 2
+	click.SoundId = "rbxassetid://9119730203"
+	click:Play()
+
+	local nope = Instance.new("Sound")
+	nope.Parent = workspace
+	nope.Volume = 2
+	nope.SoundId = "rbxassetid://9071933477"
+	nope:Play()
+
+	for _, v in ipairs(tv:GetDescendants()) do
+		if v:IsA("Texture") then
+			ts:Create(
+				v,
+				TweenInfo.new(3),
+				{Color3 = Color3.fromRGB(111, 0, 255)}
+			):Play()
+		end
+	end
+
+	prompt:Destroy()
+
+	task.wait(3)
+
+	if not obj.Parent or dead then
+		return
+	end
+
+	local nhead = obj:FindFirstChild("Head", true)
+
+	if nhead and nhead:IsA("BasePart") then
+		camera.CameraType = Enum.CameraType.Scriptable
+
+if camcon then
+	camcon:Disconnect()
+end
+
+camcon = rs.RenderStepped:Connect(function()
+	if nhead.Parent and not dead then
+		local pos = nhead.Position + nhead.CFrame.LookVector * 5
+
+		camera.CFrame = CFrame.lookAt(
+			pos,
+			nhead.Position
+		)
+	end
+end)
+
+
+
+task.wait(2)
+
+local glitch = Instance.new("Sound")
+ glitch.Parent = workspace
+	glitch.Volume = 1.5
+	glitch.SoundId = "rbxassetid://139310882854462"
+	glitch:Play()
+
+local cc = Instance.new("ColorCorrectionEffect")
+cc.Name = "MainColorCorrection"
+cc.Parent = game.Lighting
+cc.TintColor = Color3.fromRGB(111, 0, 255)
+cc.Contrast = 5
+
+task.spawn(function()
+	while cc and not dead do
+		cc.Contrast = 100
+		task.wait(0.005)
+		cc.Contrast = 5
+		task.wait(0.005)
+	end
+end)
+
+	if not nhead.Parent or dead then
+		return
+	end
+
+	local box, size = obj:GetBoundingBox()
+local center = box.Position
+
+	for _, v in ipairs(obj:GetDescendants()) do
+		if v:IsA("BasePart") then
+			v.Color = Color3.fromRGB(111, 0, 255)
+		elseif v:IsA("Texture") then
+			v.Color3 = Color3.new(1, 1, 1)
+		elseif v:IsA("ParticleEmitter") then
+	v.Color = ColorSequence.new(Color3.fromRGB(111, 0, 255))
+		elseif v:IsA("Light") then
+			v.Color = Color3.fromRGB(111, 0, 255)
+			v.Brightness *= 3
+		end
+	end
+	
+	local blayes = false
+
+	task.spawn(function()
+		while not blayes do
+			local x = center.X + math.random(-500, 500) / 100
+			local z = center.Z + math.random(-500, 500) / 100
+			local y = center.Y
+
+			local rot = math.rad(math.random(0, 180))
+
+			obj:PivotTo(
+				CFrame.new(x, y, z) *
+				CFrame.Angles(0, rot, 0)
+			)
+
+			task.wait(0.025)
+		end
+	end)
+	
+	glitch.Ended:Wait()
+	cc:Destroy() 
+	fizzlepart:Emit(1)
+	
+	blayes = true
+	
+
+	
+	local bay = Instance.new("Sound")
+ bay.Parent = workspace
+	bay.Volume = 1.5
+	bay.SoundId = "rbxassetid://139682612041479"
+	bay:Play()
+	
+	for _, v in ipairs(obj:GetDescendants()) do
+	if v:IsA("BasePart") then
+		ts:Create(
+			v,
+			TweenInfo.new(2),
+			{Transparency = 1}
+		):Play()
+	end
+end
+task.wait(3)
+obj:Destroy()
+	
+	if camcon then
+	camcon:Disconnect()
+	camcon = nil
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/PAKKALCKKWKKJXIODKRBFHHAUJCJJJSNDJ/piuyqykpcbbejsjbxhdkkksiaokdjhhsjsjhhxhhd/refs/heads/main/glitchnoise"))() 
+
+	end
+end)
+			
+			task.spawn(function()
+	while obj.Parent and not dead do
+	if frozen then
+		task.wait(0.03)
+		continue
+	end
+
+	local dis = (hrp.Position - obj:GetPivot().Position).Magnitude
+
+		if not far and dis > 100 then
+			far = true
+			
+			fizzlepart:Emit(1)
+
+			speed = basespeed * 4
+			rotspd = baserot * 20
+			walktrack:AdjustSpeed(4)
+			footstep.PlaybackSpeed = 3
+			
+			fastcon.Enabled = true
+
+			for _, v in ipairs(obj:GetDescendants()) do
+				if v:IsA("BasePart") then
+					if colors[v] == nil then
+						colors[v] = v.Color
+					end
+
+					v.Color = Color3.fromRGB(9, 59, 237)
+				end
+			end
+			
+			for _, v in ipairs(obj:GetDescendants()) do
+	if v:IsA("Texture") then
+		if texcolors[v] == nil then
+			texcolors[v] = v.Color3
+		end
+
+		v.Color3 = Color3.new(1, 1, 1)
+	end
+end
+
+			if flizzleSound then
+				flizzleSound:Play()
+			end
+			
+			if fastfor then
+			fastfor.Looped = true
+				fastfor:Play()
+			end
+
+			paused = false
+
+			if pauseicon then
+				pauseicon.Enabled = false
+			end
+
+			if pauseblack then
+				pauseblack.Enabled = false
+			end
+
+			if playicon then
+				playicon.Enabled = true
+			end
+
+		elseif far and dis < 30 then
+			far = false
+			
+			fastfor.Playing = false
+			fastcon.Enabled = false
+			footstep.PlaybackSpeed = footstepog
+
+			speed = basespeed
+			rotspd = baserot 
+			walktrack:AdjustSpeed(1)
+
+			local moving = hum.MoveDirection.Magnitude > 0.01
+
+			for _, v in ipairs(obj:GetDescendants()) do
+				if v:IsA("BasePart") then
+					if moving then
+						if colors[v] then
+							v.Color = colors[v]
+						end
+					else
+						v.Color = Color3.new(0, 0, 0)
+					end
+				end
+			end
+			
+			for v, color in pairs(texcolors) do
+	if v.Parent then
+		v.Color3 = color
+	end
+end
+
+			paused = not moving
+
+			if paused then
+				if pauseicon then
+					pauseicon.Enabled = true
+				end
+
+				if pauseblack then
+					pauseblack.Enabled = true
+				end
+
+				if playicon then
+					playicon.Enabled = false
+				end
+
+				walktrack:AdjustSpeed(0)
+			else
+				if pauseicon then
+					pauseicon.Enabled = false
+				end
+
+				if pauseblack then
+					pauseblack.Enabled = false
+				end
+
+				if playicon then
+					playicon.Enabled = true
+				end
+			end
+		end
+
+		task.wait(0.03)
+	end
+end)
+			
+			task.spawn(function()
+	while obj.Parent and not dead do
+		if (hrp.Position - obj:GetPivot().Position).Magnitude < 25 then
+			spawnShake:ShakeOnce(
+				3,
+				7,
+				0,
+				0.05,
+				0,
+				0.8
+			)
+		end
+
+		task.wait(0.03)
+	end
+end)
+
+
+			task.spawn(function()
+				playPath(obj)
+			end)
+
+			task.spawn(function()
+	local lastpos = hrp.Position
+
+	while obj.Parent and walktrack.IsPlaying and not dead do
+		task.wait(0.01)
+
+		if dead then
+			break
+		end
+
+		local pos = hrp.Position
+		local moved = (pos - lastpos).Magnitude > 0.01
+		local moving = moved or hum.MoveDirection.Magnitude > 0.01
+
+		lastpos = pos
+
+if not far then
+	if moving then
+		resumeModel()
+	else
+		pauseModel()
+	end
+end
+
+		if not paused and not far and obj:IsA("Model") then
+			local boxcf, boxsize = obj:GetBoundingBox()
+			local pcf, psize = hrp.CFrame, Vector3.new(2, 3, 2)
+
+			local min1 = boxcf.Position - boxsize / 2
+			local max1 = boxcf.Position + boxsize / 2
+			local min2 = pcf.Position - psize / 2
+			local max2 = pcf.Position + psize / 2
+
+			if min1.X <= max2.X and max1.X >= min2.X
+				and min1.Y <= max2.Y and max1.Y >= min2.Y
+				and min1.Z <= max2.Z and max1.Z >= min2.Z then
+				killModel()
+				break
+			end
+		end
+	end
+end)
+		end
+	end
+elseif obj:IsA("BasePart") then
+	obj.CFrame = cf
+end
