@@ -23,6 +23,11 @@ local fakeout = GetGitSound("https://github.com/lynguyen26031993-design/-u/raw/r
 	fakeout.Parent = workspace
 	fakeout.Name = "Fakeout"
 	fakeout.Volume = 3
+	
+	local ragebaited = GetGitSound("https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/Ohh%20im%20angry!.mp3?raw=true","jcoalskkxjcj")
+	ragebaited.Parent = workspace
+	ragebaited.Name = "Finalrrbound"
+	ragebaited.Volume = 2
 
 local function SpawnRebound()
 
@@ -34,9 +39,54 @@ end
 
 local r = math.random(1, 2)
 
+local CameraShaker = require(game.ReplicatedStorage.CameraShaker)
+local CameraShaker = require(game.ReplicatedStorage:WaitForChild("CameraShaker"))
+local camera = workspace.CurrentCamera
+
+local spawnShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+	camera.CFrame = camera.CFrame * shakeCf
+end)
+
+spawnShake:Start()
+
+spawnShake:ShakeOnce(
+	5,   -- Magnitude (mạnh)
+	1,   -- Roughness
+	0.05, -- FadeIn
+	3, -- FadeOut
+	0,    -- PositionInfluence
+	0.8   -- RotationInfluence
+)
+
+function light(tim, color0, color1)
+	local tweenservice = game:GetService("TweenService")
+	local info = TweenInfo.new(tim, Enum.EasingStyle.Linear)
+	local room = game.Workspace.CurrentRooms:FindFirstChild(tostring(game.ReplicatedStorage.GameData.LatestRoom.Value))
+
+	if not room then return end
+
+	for _, light in pairs(room:GetDescendants()) do
+		if light:IsA("Light") or light:IsA("SurfaceLight") or light:IsA("SpotLight") then
+			local target = {Color = color1}
+			local anim = tweenservice:Create(light, info, target)
+			anim:Play()
+		end
+
+		if light:IsA("MeshPart") and light.Material == Enum.Material.Neon and light.Name ~= "Skybox" then
+			local target1 = {Color = color0}
+			local anim2 = tweenservice:Create(light, info, target1)
+			anim2:Play()
+		end
+	end
+end
+
+task.spawn(function() 
+light(0, Color3.fromRGB(0, 221, 255), Color3.fromRGB(0, 151, 171))
+end) 
+
 local sound = Instance.new("Sound")
 	sound.SoundId = "rbxassetid://6734393210"
-	sound.Volume = 1
+	sound.Volume = 0.5
 	sound.Parent = workspace
 	sound:Play()
 
@@ -55,7 +105,7 @@ local sound = Instance.new("Sound")
 
 	local sound1 = Instance.new("Sound")
 	sound1.SoundId = "rbxassetid://5246103002"
-	sound1.Volume = 1
+	sound1.Volume = 0.5
 	sound1.Parent = workspace
 	sound1:Play()
 
@@ -85,7 +135,7 @@ if player and player:FindFirstChild("PlayerGui") then
 
 	local flashFrame = Instance.new("Frame")
 	flashFrame.Size = UDim2.new(1, 0, 1, 0)
-	flashFrame.BackgroundColor3 = Color3.fromRGB(0, 102, 255) -- Vibrant Blue
+	flashFrame.BackgroundColor3 = Color3.fromRGB(0, 221, 255) -- Vibrant Blue
 	flashFrame.BackgroundTransparency = 0 -- Full visibility instantly
 	flashFrame.BorderSizePixel = 0
 	flashFrame.Parent = flashGui
@@ -105,6 +155,7 @@ end)
 
 
 if fakeoutye then
+speed = 800
 task.wait(5)
 fakeout:Play()
 task.wait(1.2)
@@ -128,31 +179,28 @@ spawnShake:ShakeOnce(
 )
 local ts = game:GetService("TweenService")
 local rooms = workspace:WaitForChild("CurrentRooms")
+local latest = game:GetService("ReplicatedStorage").GameData.LatestRoom
+local room = rooms:FindFirstChild(tostring(latest.Value))
 local col = Color3.fromRGB(252, 3, 232)
 local red = Color3.fromRGB(255, 0, 0)
 local info = TweenInfo.new(1.5)
 local orig = {}
 
-for _, v in ipairs(rooms:GetDescendants()) do
-	if v:IsA("Light") or (v:IsA("BasePart") and v.Material == Enum.Material.Neon) then
+if not room then return end
+
+for _, v in ipairs(room:GetDescendants()) do
+	if v:IsA("Light") or (v:IsA("BasePart") and v.Material == Enum.Material.Neon and v.Name ~= "Skybox") then
 		orig[v] = v.Color
 		v.Color = col
 
-		task.delay(0.1, function()
-			if not v.Parent then return end
-
-			ts:Create(v, info, {Color = red}):Play()
-
-			task.delay(4, function()
-				if v.Parent then
-					ts:Create(v, info, {Color = orig[v]}):Play()
-				end
+			task.delay(0.1, function()
+				if not v.Parent then return end
+				ts:Create(v, info, {Color = orig[v]}):Play()
 			end)
-		end)
 	end
 end
 
-task.wait(1.5)
+task.wait(0.7)
 else
 task.wait(2.5)
 end
@@ -189,7 +237,7 @@ local entity = Spawner:Create({
 	Movement = {
 		Speed = speed + (spawnCount - 1) * 10, 
 		Delay = 0,
-		Reversed = math.random(1,2)
+		Reversed = math.random(1,2) 
 	},
 	Rebounding = {
 		Enabled = false,
@@ -199,7 +247,7 @@ local entity = Spawner:Create({
 		Delay = 0
 	},
 	Damage = {
-		Enabled = true,
+		Enabled = false,
 		Range = 60,
 		Amount = 40
 	},
@@ -226,7 +274,7 @@ entity:SetCallback("OnSpawned", function()
 	local TweenService = game:GetService("TweenService")
 	local TweenService = game:GetService("TweenService")
 	
-	
+	speed = getgenv().FasterTrouble and 225 or 180
 
 	wait(4)
 
@@ -366,7 +414,7 @@ end
 
 local LatestRoom = game.ReplicatedStorage.GameData.LatestRoom
 
-local maxSpawns = math.random(2,4)
+local maxSpawns = math.random(1,3)
 local spawned = 0
 
 task.spawn(function()
