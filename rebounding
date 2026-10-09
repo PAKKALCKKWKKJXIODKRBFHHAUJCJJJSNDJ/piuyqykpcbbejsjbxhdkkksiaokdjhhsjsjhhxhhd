@@ -9,8 +9,6 @@ else
 speed = 180
 end
 
-local function SpawnRebound()
-
 function GetGitSound(GithubSnd,SoundName)
 	local url=GithubSnd
 	if not isfile(SoundName..".mp3") then
@@ -21,9 +19,148 @@ function GetGitSound(GithubSnd,SoundName)
 	return sound
 end
 
+local fakeout = GetGitSound("https://github.com/lynguyen26031993-design/-u/raw/refs/heads/main/rebound%20fakeout.mp3?raw=true","jckskskjxjccjf")
+	fakeout.Parent = workspace
+	fakeout.Name = "Fakeout"
+	fakeout.Volume = 3
+
+local function SpawnRebound()
+
+local fakeoutye = false
+local hhah = math.random(1,4)
+if hhah == 1 then
+fakeoutye = true
+end
+
+local r = math.random(1, 2)
+
+local sound = Instance.new("Sound")
+	sound.SoundId = "rbxassetid://6734393210"
+	sound.Volume = 1
+	sound.Parent = workspace
+	sound:Play()
+
+	local ids = Instance.new("DistortionSoundEffect")
+	ids.Level = 0.65
+	ids.Parent = sound
+	
+	
+
+	local revers = Instance.new("ReverbSoundEffect")
+	revers.DecayTime = 1.5
+	revers.Density = 1
+	revers.Diffusion = 1
+	revers.DryLevel = -6
+	revers.Parent = sound
+
+	local sound1 = Instance.new("Sound")
+	sound1.SoundId = "rbxassetid://5246103002"
+	sound1.Volume = 1
+	sound1.Parent = workspace
+	sound1:Play()
+
+	local ids1 = Instance.new("DistortionSoundEffect")
+	ids1.Level = 0.65
+	ids1.Parent = sound1
+
+	local revers1 = Instance.new("ReverbSoundEffect")
+	revers1.DecayTime = 1.5
+	revers1.Density = 1
+	revers1.Diffusion = 1
+	revers1.DryLevel = -6
+	revers1.Parent = sound1
+
+	local pitch = Instance.new("PitchShiftSoundEffect")
+	pitch.Octave = 0.5
+	pitch.Parent = sound1
+	
+	task.spawn(function() 
+	local player = game.Players.LocalPlayer
+if player and player:FindFirstChild("PlayerGui") then
+	local flashGui = Instance.new("ScreenGui")
+	flashGui.Name = "ReboundDoorFlash"
+	flashGui.IgnoreGuiInset = true
+	flashGui.DisplayOrder = 999998
+	flashGui.Parent = player.PlayerGui
+
+	local flashFrame = Instance.new("Frame")
+	flashFrame.Size = UDim2.new(1, 0, 1, 0)
+	flashFrame.BackgroundColor3 = Color3.fromRGB(0, 102, 255) -- Vibrant Blue
+	flashFrame.BackgroundTransparency = 0 -- Full visibility instantly
+	flashFrame.BorderSizePixel = 0
+	flashFrame.Parent = flashGui
+
+	-- Smoothly fade out the flash frame
+	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
+	local fadeTween = game:GetService("TweenService"):Create(flashFrame, tweenInfo, {BackgroundTransparency = 1})
+	fadeTween:Play()
+
+	fadeTween.Completed:Wait()
+	flashGui:Destroy()
+end
+
+
+end) 
+
+
+
+if fakeoutye then
+task.wait(5)
+fakeout:Play()
+task.wait(1.2)
+local CameraShaker = require(game.ReplicatedStorage.CameraShaker)
+local CameraShaker = require(game.ReplicatedStorage:WaitForChild("CameraShaker"))
+local camera = workspace.CurrentCamera
+
+local spawnShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
+	camera.CFrame = camera.CFrame * shakeCf
+end)
+
+spawnShake:Start()
+
+spawnShake:ShakeOnce(
+	20,   -- Magnitude (mạnh)
+	3,   -- Roughness
+	0.05, -- FadeIn
+	3, -- FadeOut
+	0,    -- PositionInfluence
+	0.8   -- RotationInfluence
+)
+local ts = game:GetService("TweenService")
+local rooms = workspace:WaitForChild("CurrentRooms")
+local col = Color3.fromRGB(252, 3, 232)
+local red = Color3.fromRGB(255, 0, 0)
+local info = TweenInfo.new(1.5)
+local orig = {}
+
+for _, v in ipairs(rooms:GetDescendants()) do
+	if v:IsA("Light") or (v:IsA("BasePart") and v.Material == Enum.Material.Neon) then
+		orig[v] = v.Color
+		v.Color = col
+
+		task.delay(0.1, function()
+			if not v.Parent then return end
+
+			ts:Create(v, info, {Color = red}):Play()
+
+			task.delay(4, function()
+				if v.Parent then
+					ts:Create(v, info, {Color = orig[v]}):Play()
+				end
+			end)
+		end)
+	end
+end
+
+task.wait(1.5)
+else
+task.wait(2.5)
+end
+
+
 ---====== Load spawner ======---
 
-local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/cakmay227-svg/random/refs/heads/main/spawnerforrebound"))()
+local Spawner = loadstring(game:HttpGet("https://raw.githubusercontent.com/KJXJSJJCHHCHFHDHHJCJJDKSKDKOPAPPJD/HAXRHCHHCHCHJSJSLKKKJDPQOIJXHBS/refs/heads/main/newrebound%20spawner%20test"))()
 
 ---====== Create entity ======---
 
@@ -51,11 +188,11 @@ local entity = Spawner:Create({
 	},
 	Movement = {
 		Speed = speed + (spawnCount - 1) * 10, 
-		Delay = 5,
-		Reversed = math.random(1, 2) == 1
+		Delay = 0,
+		Reversed = math.random(1,2)
 	},
 	Rebounding = {
-		Enabled = math.random(1, 100) <= 20,
+		Enabled = false,
 		Type = "Ambush", -- "Blitz"
 		Min = 1,
 		Max = 1,
@@ -83,95 +220,13 @@ local entity = Spawner:Create({
 
 entity:SetCallback("OnSpawned", function()
 	print("Entity has spawned")
-	task.spawn(function() 
-	local player = game.Players.LocalPlayer
-if player and player:FindFirstChild("PlayerGui") then
-	local flashGui = Instance.new("ScreenGui")
-	flashGui.Name = "ReboundDoorFlash"
-	flashGui.IgnoreGuiInset = true
-	flashGui.DisplayOrder = 999998
-	flashGui.Parent = player.PlayerGui
+	
 
-	local flashFrame = Instance.new("Frame")
-	flashFrame.Size = UDim2.new(1, 0, 1, 0)
-	flashFrame.BackgroundColor3 = Color3.fromRGB(0, 102, 255) -- Vibrant Blue
-	flashFrame.BackgroundTransparency = 0 -- Full visibility instantly
-	flashFrame.BorderSizePixel = 0
-	flashFrame.Parent = flashGui
-
-	-- Smoothly fade out the flash frame
-	local tweenInfo = TweenInfo.new(0.8, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out)
-	local fadeTween = game:GetService("TweenService"):Create(flashFrame, tweenInfo, {BackgroundTransparency = 1})
-	fadeTween:Play()
-
-	fadeTween.Completed:Wait()
-	flashGui:Destroy()
-end
-
-local CameraShaker = require(game.ReplicatedStorage.CameraShaker)
-local camara = game.Workspace.CurrentCamera
-local camShake = CameraShaker.new(Enum.RenderPriority.Camera.Value, function(shakeCf)
-	camara.CFrame = camara.CFrame * shakeCf
-end)
-camShake:Start()
-camShake:ShakeOnce(25,7.5,0.1,2,2,0.1)
-end) 
-
-	local bruh = workspace["ReboundFr" .. spawnCount].RushNew
+	local bruh = entity.Model.RushNew
 	local TweenService = game:GetService("TweenService")
 	local TweenService = game:GetService("TweenService")
-	local sound = Instance.new("Sound")
-	sound.SoundId = "rbxassetid://6734393210"
-	sound.Volume = 3
-	sound.Parent = workspace
-	sound:Play()
-
-	local ids = Instance.new("DistortionSoundEffect")
-	ids.Level = 0.65
-	ids.Parent = sound
 	
 	
-
-	local revers = Instance.new("ReverbSoundEffect")
-	revers.DecayTime = 1.5
-	revers.Density = 1
-	revers.Diffusion = 1
-	revers.DryLevel = -6
-	revers.Parent = sound
-
-	local sound1 = Instance.new("Sound")
-	sound1.SoundId = "rbxassetid://5246103002"
-	sound1.Volume = 3
-	sound1.Parent = workspace
-	sound1:Play()
-
-	local ids1 = Instance.new("DistortionSoundEffect")
-	ids1.Level = 0.65
-	ids1.Parent = sound1
-
-	local revers1 = Instance.new("ReverbSoundEffect")
-	revers1.DecayTime = 1.5
-	revers1.Density = 1
-	revers1.Diffusion = 1
-	revers1.DryLevel = -6
-	revers1.Parent = sound1
-
-	local pitch = Instance.new("PitchShiftSoundEffect")
-	pitch.Octave = 0.5
-	pitch.Parent = sound1
-	
-	local idk = GetGitSound("https://github.com/eoyoustme/Impossible/blob/main/rebound%20jumpscare.mp3?raw=true", "uhhhhxhhs")
-
-blueSound = Instance.new("Sound")
-	blueSound.SoundId = idk.SoundId
-	blueSound.PlaybackSpeed = 1
-	blueSound.Looped = false
-	blueSound.RollOffMaxDistance = 150
-	blueSound.Parent = workspace["ReboundFr" .. spawnCount].RushNew
-	blueSound.TimePosition = 4
-	blueSound.Volume = 2
-
-	gitSoundTemp:Destroy()
 
 	wait(4)
 
@@ -199,12 +254,6 @@ blueSound = Instance.new("Sound")
 	wait(0.1)
 	vroom:Play()
 	move:Play()
-	task.spawn(function()
-		while true do
-			wait(0.1)
-			entity.Config.Movement.Speed = entity.Config.Movement.Speed + 0.1
-		end
-	end)
 end)
 
 entity:SetCallback("OnStartMoving", function()
@@ -291,78 +340,11 @@ entity:SetCallback("OnDespawned", function()
 end)
 
 entity:SetCallback("OnDamagePlayer", function(newHealth: number)
-	if newHealth <= 0 then
+	if newHealth <= 2 then
 		print("Entity has killed the player")
 		loadstring(game:HttpGet("https://raw.githubusercontent.com/cakmay227-svg/REBLAHARDCOREDI/refs/heads/main/ReboundJumpscare"))() 
 	else
-	blueSound:Play() 
 	
-		local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local ContentProvider = game:GetService("ContentProvider")
-
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
-task.spawn(function()
-    -- 1. Tạo ScreenGui và ImageLabel
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "JumpscareOverlay"
-    screenGui.IgnoreGuiInset = true
-    screenGui.DisplayOrder = 999999
-    screenGui.Parent = playerGui
-
-    local imageLabel = Instance.new("ImageLabel")
-    imageLabel.BackgroundTransparency = 1
-    imageLabel.BorderSizePixel = 0
-    imageLabel.Position = UDim2.new(0, 0, 0, 0)
-    imageLabel.Size = UDim2.new(1, 0, 1, 0)
-    imageLabel.ScaleType = Enum.ScaleType.Stretch
-    imageLabel.ImageTransparency = 0.25
-    imageLabel.Visible = true
-    imageLabel.ImageColor3 = Color3.fromRGB(143,199,255)
-    imageLabel.Parent = screenGui
-
-    -- Danh sách ảnh jumpscare nhấp nháy
-    local jumpscareImages = {
-        "rbxassetid://134346506410955",
-        "rbxassetid://7578853379",
-        "rbxassetid://103846711769666",
-        "rbxassetid://78199392475572"
-    }
-
-    -- Preload ảnh trước để tránh lỗi không load kịp khi chạy hiệu ứng
-    task.spawn(function()
-        ContentProvider:PreloadAsync(jumpscareImages)
-    end)
-
-    local duration = 2 -- Thời gian hiệu ứng chạy (có thể điều chỉnh tùy ý)
-    local start = os.clock()
-    local imageIndex = 1
-
-    -- 2. Khởi tạo Tween mờ dần (từ 0.25 về 1)
-    local info = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-    local tween = TweenService:Create(imageLabel, info, {ImageTransparency = 1})
-    
-    -- 3. Chạy Tween
-    tween:Play()
-
-    -- 4. Vòng lặp đổi ảnh chạy đồng thời với Tween
-    while os.clock() - start < duration do
-        if not imageLabel or not imageLabel.Parent then break end
-        imageLabel.Image = jumpscareImages[imageIndex]
-        imageIndex = (imageIndex % #jumpscareImages) + 1
-        task.wait(0.04) -- Tốc độ chớp ảnh ổn định hơn
-    end
-
-    -- 5. Đợi Tween hoàn thành hẳn rồi dọn dẹp GUI
-    if tween.PlaybackState == Enum.PlaybackState.Playing then
-        tween.Completed:Wait()
-    end
-    
-    screenGui:Destroy()
-end)
-
 	end
 end)
 
@@ -384,7 +366,7 @@ end
 
 local LatestRoom = game.ReplicatedStorage.GameData.LatestRoom
 
-local maxSpawns = math.random(3,6)
+local maxSpawns = math.random(2,4)
 local spawned = 0
 
 task.spawn(function()
